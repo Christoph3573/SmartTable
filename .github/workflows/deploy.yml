@@ -60,8 +60,8 @@ jobs:
       - name: Show runner's public key
         run: ssh-keygen -y -f ~/.ssh/id_ed25519
 
-      - name: Verify SSH connection
-        run: ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes pi-via-vm 'echo connected as $(whoami) on $(hostname)'
+      - name: Debug SSH to pi-via-vm
+        run: ssh -vvv -i ~/.ssh/id_ed25519 -o BatchMode=yes pi-via-vm 'whoami' 2>&1 | tail -80
 
       - name: Run Ansible Playbook
         working-directory: session-03-webserver-ansible
