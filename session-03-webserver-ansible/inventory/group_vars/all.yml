@@ -1,3 +1,4 @@
 ---
 # Gemeinsame Variablen für alle Hosts.
 # Absichtlich leer: Definiert nur Variablen, die ihr wirklich nutzt.
+site_name: "caddy-site"

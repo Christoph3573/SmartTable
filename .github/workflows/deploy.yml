@@ -1,0 +1,34 @@
+name: Deploy via Ansible
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'session-03-webserver-ansible/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Add VM to known_hosts
+        run: |
+          ssh-keyscan -H codeclub.check24.fun >> ~/.ssh/known_hosts
+
+      - name: Run Ansible playbook
+        working-directory: session-03-webserver-ansible
+        run: |
+          ansible-playbook deploy.yml -i inventory/hosts

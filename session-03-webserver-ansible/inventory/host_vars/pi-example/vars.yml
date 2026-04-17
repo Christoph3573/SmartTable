@@ -1,5 +1,3 @@
 ---
 # Host-spezifische Variablen für pi-example.
-# Absichtlich leer: Füllt nur ein, was eure Tasks brauchen.
-[webservers]
-check ansible_host=127.0.0.1 ansible_port=6060 ansible_user=christoph
+# Füllt nur ein, was eure Tasks brauchen.
