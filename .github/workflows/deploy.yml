@@ -18,17 +18,33 @@ jobs:
       - name: Install Ansible
         run: pip install ansible
 
-      - name: Set up SSH key
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
 
-      - name: Add VM to known_hosts
-        run: |
-          ssh-keyscan -H codeclub.check24.fun >> ~/.ssh/known_hosts
+          # CI-Private-Key aus Secret schreiben
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ci
+          chmod 600 ~/.ssh/id_ci
+
+          # SSH-Config: Jump-Host-Alias für Ansible
+          cat >> ~/.ssh/config << EOF
+          Host codeclub-vm
+            HostName ${{ secrets.VM_HOST }}
+            User ${{ secrets.VM_USER }}
+            IdentityFile ~/.ssh/id_ci
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
+
+          # VM-Hostkey eintragen (verhindert interactive prompt)
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Run Ansible playbook
         working-directory: session-03-webserver-ansible
         run: |
-          ansible-playbook deploy.yml -i inventory/hosts
+          ansible-playbook deploy.yml \
+            -i inventory/hosts \
+            -e "ansible_port=${{ secrets.PI_TUNNEL_PORT }}" \
+            -e "ansible_user=${{ secrets.PI_USER }}" \
+            -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o IdentityFile=~/.ssh/id_ci -o ProxyJump=codeclub-vm'"
