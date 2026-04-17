@@ -2,7 +2,7 @@ name: Deploy via Ansible
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix]
     paths:
       - 'session-03-webserver-ansible/**'
   workflow_dispatch:
