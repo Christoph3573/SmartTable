@@ -4,13 +4,13 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=pi
+User={{ tunnel_user }}
 ExecStart=/usr/bin/autossh -M 0 \
   -o "ServerAliveInterval 30" \
   -o "ServerAliveCountMax 3" \
   -o "ExitOnForwardFailure yes" \
-  -i /home/pi/.ssh/id_tunnel \
-  -N -R 16060:127.0.0.1:80 tunnel-christoph@codeclub.check24.fun
+  -i /home/{{ tunnel_user }}/.ssh/id_tunnel \
+  -N -R {{ tunnel_remote_port }}:127.0.0.1:{{ tunnel_local_port }} {{ tunnel_remote_user }}@{{ tunnel_remote_host }}
 Restart=always
 RestartSec=10
 

@@ -1,50 +1,44 @@
-name: Deploy via Ansible
+name: Deploy via Jump Host
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - 'session-03-webserver-ansible/**'
-  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install Ansible
-        run: pip install ansible
+        run: |
+          pip install ansible
+          ansible-galaxy collection install ansible.posix
 
-      - name: Set up SSH
+      - name: Setup SSH (key + jump host config)
         run: |
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
 
-          # CI-Private-Key aus Secret schreiben
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ci
-          chmod 600 ~/.ssh/id_ci
-
-          # SSH-Config: Jump-Host-Alias für Ansible
-          cat >> ~/.ssh/config << EOF
+          cat > ~/.ssh/config <<EOF
           Host codeclub-vm
             HostName ${{ secrets.VM_HOST }}
             User ${{ secrets.VM_USER }}
-            IdentityFile ~/.ssh/id_ci
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking yes
+
+          Host check
+            HostName 127.0.0.1
+            Port ${{ secrets.PI_TUNNEL_PORT }}
+            User ${{ secrets.PI_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            ProxyJump codeclub-vm
             StrictHostKeyChecking no
           EOF
-          chmod 600 ~/.ssh/config
 
-          # VM-Hostkey eintragen (verhindert interactive prompt)
-          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Run Ansible playbook
+      - name: Run Ansible Playbook
         working-directory: session-03-webserver-ansible
-        run: |
-          ansible-playbook deploy.yml \
-            -i inventory/hosts \
-            -e "ansible_port=${{ secrets.PI_TUNNEL_PORT }}" \
-            -e "ansible_user=${{ secrets.PI_USER }}" \
-            -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o IdentityFile=~/.ssh/id_ci -o ProxyJump=codeclub-vm'"
+        run: ansible-playbook deploy.yml -i inventory/hosts

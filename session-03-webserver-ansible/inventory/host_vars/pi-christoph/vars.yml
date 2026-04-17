@@ -1,0 +1,6 @@
+---
+tunnel_user: christoph
+tunnel_remote_user: tunnel-christoph
+tunnel_remote_host: codeclub.check24.fun
+tunnel_remote_port: 16060
+tunnel_local_port: 80
