@@ -38,3 +38,14 @@ jobs:
             ProxyJump codeclub-vm
             StrictHostKeyChecking no
           EOF
+
+      - name: Run Ansible playbook
+        working-directory: session-03-webserver-ansible
+        run: |
+          ansible-playbook deploy.yml \
+            -i inventory/hosts \
+            -e "ansible_host=pi-via-vm" \
+            -e "ansible_port=${{ secrets.PI_TUNNEL_PORT }}" \
+            -e "ansible_user=${{ secrets.PI_USER }}" \
+            -e "ansible_ssh_private_key_file=~/.ssh/id_ed25519" \
+            -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
