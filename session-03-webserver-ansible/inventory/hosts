@@ -1,4 +1,2 @@
 [webservers]
-# Lokal: ansible_port und ansible_user ggf. anpassen
-# In der CI werden diese Werte über -e aus den Secrets überschrieben
-pi-example ansible_host=localhost ansible_port=6060 ansible_user=christoph ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ProxyJump=christoph@codeclub.check24.fun'
+pi-example ansible_host=localhost ansible_port=6060 ansible_user=christoph ansible_ssh_common_args='-o ProxyJump=christoph.beier@codeclub.check24.fun'
