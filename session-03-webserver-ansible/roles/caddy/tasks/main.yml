@@ -1,0 +1,30 @@
+- name: Install caddy
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Deploy Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /etc/caddy/Caddyfile
+    mode: "0644"
+
+- name: Copy site/ auf den Server
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/site/"
+    dest: "/var/www/mysite/"
+    owner: www-data
+    group: www-data
+    mode: "0644"
+    directory_mode: "0755"
+
+- name: Validate caddy config
+  ansible.builtin.command: caddy validate --config /etc/caddy/Caddyfile
+  changed_when: false
+
+- name: Ensure caddy is running
+  ansible.builtin.service:
+    name: caddy
+    state: started
+    enabled: true
