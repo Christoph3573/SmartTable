@@ -57,6 +57,9 @@ jobs:
       - name: Show resolved SSH config
         run: ssh -G pi-via-vm | grep -E '^(hostname|port|user|proxyjump) '
 
+      - name: Show runner's public key
+        run: ssh-keygen -y -f ~/.ssh/id_ed25519
+
       - name: Verify SSH connection
         run: ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes pi-via-vm 'echo connected as $(whoami) on $(hostname)'
 
