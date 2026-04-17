@@ -30,7 +30,7 @@ jobs:
             IdentityFile ~/.ssh/id_ed25519
             StrictHostKeyChecking yes
 
-          Host pi-via-vm
+          Host check
             HostName 127.0.0.1
             Port ${{ secrets.PI_TUNNEL_PORT }}
             User ${{ secrets.PI_USER }}
@@ -38,30 +38,6 @@ jobs:
             ProxyJump codeclub-vm
             StrictHostKeyChecking no
           EOF
-
-      - name: Verify SSH key exists
-        run: |
-          if [ ! -f ~/.ssh/id_ed25519 ]; then
-            echo " Key file ~/.ssh/id_ed25519 not found"
-            exit 1
-          fi
-          echo "✅Key file exists"
-          ls -la ~/.ssh/id_ed25519
-          echo "--- Key header ---"
-          head -1 ~/.ssh/id_ed25519
-          echo "--- Line count ---"
-          wc -l ~/.ssh/id_ed25519
-          echo "--- Validate key ---"
-          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null && echo " Key is valid" || echo "Key is invalid"
-      
-      - name: Show resolved SSH config
-        run: ssh -G pi-via-vm | grep -E '^(hostname|port|user|proxyjump) '
-
-      - name: Show runner's public key
-        run: ssh-keygen -y -f ~/.ssh/id_ed25519
-
-      - name: Debug SSH to pi-via-vm
-        run: ssh -vvv -i ~/.ssh/id_ed25519 -o BatchMode=yes pi-via-vm 'whoami' 2>&1 | tail -80
 
       - name: Run Ansible Playbook
         working-directory: session-03-webserver-ansible
