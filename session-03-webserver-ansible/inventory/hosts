@@ -1,2 +1,2 @@
 [webservers]
-pi-christoph ansible_host=localhost ansible_port=6060 ansible_user=christoph ansible_ssh_common_args='-o ProxyJump=christoph.beier@codeclub.check24.fun'
+pi-christoph ansible_host=pi-via-vm
