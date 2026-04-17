@@ -1,0 +1,8 @@
+---
+- name: Session 03 Provision-Gerüst
+  hosts: webservers
+  become: true
+  tasks:
+    - name: TODO - optionale Provisioning-Tasks
+      ansible.builtin.debug:
+        msg: "Hier könnt ihr später Provisioning-Schritte sammeln."
