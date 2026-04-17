@@ -2,7 +2,7 @@
 - name: Session 03 Ansible-Gerüst
   hosts: webservers
   become: true
-  tasks:
-    - name: TODO - ersetze dieses Beispiel mit deinem ersten echten Task
-      ansible.builtin.debug:
-        msg: "Gerüst läuft. Baut jetzt euer Playbook Schritt für Schritt aus."
+  roles:
+    - caddy
+    - ssh_tunnel
+  

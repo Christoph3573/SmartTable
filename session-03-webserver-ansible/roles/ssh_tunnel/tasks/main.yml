@@ -1,0 +1,20 @@
+- name: autossh installieren
+  apt:
+    name: autossh
+    state: present
+    update_cache: yes
+
+- name: systemd Service kopieren
+  template:
+    src: tunnel.service.j2
+    dest: /etc/systemd/system/ssh-tunnel.service
+    mode: '0644'
+
+- name: systemd neu laden
+  command: systemctl daemon-reexec
+
+- name: Service aktivieren und starten
+  systemd:
+    name: ssh-tunnel
+    enabled: yes
+    state: started
