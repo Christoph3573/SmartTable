@@ -39,6 +39,9 @@ jobs:
             StrictHostKeyChecking no
           EOF
 
+      - name: Verify SSH connection
+        run: ssh -o BatchMode=yes pi-via-vm 'echo connected as $(whoami) on $(hostname)'
+        
       - name: Run Ansible Playbook
         working-directory: session-03-webserver-ansible
         run: ansible-playbook deploy.yml -i inventory/hosts
