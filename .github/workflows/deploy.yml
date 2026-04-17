@@ -27,16 +27,6 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ci
           chmod 600 ~/.ssh/id_ci
 
-          # SSH-Config: Jump-Host-Alias für Ansible
-          cat >> ~/.ssh/config << EOF
-          Host codeclub-vm
-            HostName ${{ secrets.VM_HOST }}
-            User ${{ secrets.VM_USER }}
-            IdentityFile ~/.ssh/id_ci
-            StrictHostKeyChecking no
-          EOF
-          chmod 600 ~/.ssh/config
-
           # VM-Hostkey eintragen (verhindert interactive prompt)
           ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
 
@@ -45,6 +35,5 @@ jobs:
         run: |
           ansible-playbook deploy.yml \
             -i inventory/hosts \
-            -e "ansible_port=${{ secrets.PI_TUNNEL_PORT }}" \
-            -e "ansible_user=${{ secrets.PI_USER }}" \
-            -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o IdentityFile=~/.ssh/id_ci -o ProxyJump=codeclub-vm'"
+            -e "ansible_ssh_private_key_file=~/.ssh/id_ci" \
+            -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ProxyJump=${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}'"
