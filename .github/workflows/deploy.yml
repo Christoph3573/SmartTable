@@ -39,9 +39,24 @@ jobs:
             StrictHostKeyChecking no
           EOF
 
+      - name: Verify SSH key exists
+        run: |
+          if [ ! -f ~/.ssh/id_ed25519 ]; then
+            echo " Key file ~/.ssh/id_ed25519 not found"
+            exit 1
+          fi
+          echo "✅Key file exists"
+          ls -la ~/.ssh/id_ed25519
+          echo "--- Key header ---"
+          head -1 ~/.ssh/id_ed25519
+          echo "--- Line count ---"
+          wc -l ~/.ssh/id_ed25519
+          echo "--- Validate key ---"
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null && echo " Key is valid" || echo "Key is invalid"
+
       - name: Verify SSH connection
-        run: ssh -o BatchMode=yes pi-via-vm 'echo connected as $(whoami) on $(hostname)'
-        
+        run: ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes pi-via-vm 'echo connected as $(whoami) on $(hostname)'
+
       - name: Run Ansible Playbook
         working-directory: session-03-webserver-ansible
         run: ansible-playbook deploy.yml -i inventory/hosts
