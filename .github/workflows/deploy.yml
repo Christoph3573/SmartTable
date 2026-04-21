@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  deploy-christoph:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,4 +41,44 @@ jobs:
 
       - name: Run Ansible Playbook
         working-directory: session-03-webserver-ansible
-        run: ansible-playbook deploy.yml -i inventory/hosts
+        run: ansible-playbook deploy.yml -i inventory --limit pi-christoph
+
+  deploy-emanuel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          pip install ansible
+          ansible-galaxy collection install ansible.posix
+
+      - name: Setup SSH (key + jump host config)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EMANUEL_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<EOF
+          Host codeclub-vm
+            HostName ${{ secrets.VM_HOST }}
+            User ${{ secrets.EMANUEL_VM_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking yes
+
+          Host pi-emanuel
+            HostName 127.0.0.1
+            Port ${{ secrets.EMANUEL_PI_TUNNEL_PORT }}
+            User ${{ secrets.EMANUEL_PI_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            ProxyJump codeclub-vm
+            StrictHostKeyChecking no
+          EOF
+
+      - name: Verify SSH connection
+        run: ssh -o BatchMode=yes pi-emanuel 'echo connected as $(whoami) on $(hostname)'
+
+      - name: Run Ansible Playbook
+        working-directory: session-03-webserver-ansible
+        run: ansible-playbook deploy.yml -i inventory --limit pi-emanuel
