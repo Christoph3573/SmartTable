@@ -1,5 +1,22 @@
 ---
-- name: Ensure web directory exists
+- name: Ensure app directory exists
+  file:
+    path: "{{ app_path }}"
+    state: directory
+
+- name: Pull latest code from git
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_path }}"
+    version: main
+    force: yes
+
+- name: Clean webroot
+  file:
+    path: /var/www/mysite
+    state: absent
+
+- name: Recreate webroot
   file:
     path: /var/www/mysite
     state: directory
@@ -7,13 +24,18 @@
     group: caddy
     mode: "0755"
 
-- name: Copy React dist folder to server
+- name: Copy React app (static files)
   copy:
-    src: "{{ react_build_path }}/"
+    src: "{{ app_path }}/{{ app_folder }}/"
     dest: /var/www/mysite/
+    remote_src: yes
+
+- name: Set permissions
+  file:
+    path: /var/www/mysite
     owner: caddy
     group: caddy
-    mode: "0755"
+    recurse: yes
 
 - name: Reload Caddy
   systemd:

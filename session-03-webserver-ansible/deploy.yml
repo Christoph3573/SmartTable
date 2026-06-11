@@ -1,10 +1,12 @@
 ---
-- name: Session 03 Ansible-Gerüst
+- name: Deploy React App to Caddy
   hosts: webservers
   become: true
 
   vars:
-    react_build_path: "../session-04-React-App/dist"
+    repo_url: "https://github.com/Christoph3573/Check24Projekt"
+    app_path: "/opt/check24app"
+    app_folder: "session-04-React-App"
 
   roles:
     - caddy
