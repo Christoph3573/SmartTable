@@ -1,2 +1,3 @@
 [webservers]
 pi-christoph ansible_host=check
+pi-emanuel ansible_host=pi-emanuel

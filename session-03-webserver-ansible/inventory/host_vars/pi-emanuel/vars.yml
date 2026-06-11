@@ -1,0 +1,6 @@
+---
+tunnel_user: pi
+tunnel_remote_user: tunnel-emanuel
+tunnel_remote_host: codeclub.check24.fun
+tunnel_remote_port: 16767
+tunnel_local_port: 8080
