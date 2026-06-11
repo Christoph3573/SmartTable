@@ -1,3 +1,21 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# tasks file for roles/react_deploy
+- name: Ensure web directory exists
+  file:
+    path: /var/www/mysite
+    state: directory
+    owner: caddy
+    group: caddy
+    mode: "0755"
+
+- name: Copy React dist folder to server
+  copy:
+    src: "{{ react_build_path }}/"
+    dest: /var/www/mysite/
+    owner: caddy
+    group: caddy
+    mode: "0755"
+
+- name: Reload Caddy
+  systemd:
+    name: caddy
+    state: reloaded

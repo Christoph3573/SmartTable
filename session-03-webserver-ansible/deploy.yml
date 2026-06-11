@@ -2,7 +2,11 @@
 - name: Session 03 Ansible-Gerüst
   hosts: webservers
   become: true
+
+  vars:
+    react_build_path: "../session-04-React-App/dist"
+
   roles:
     - caddy
     - ssh_tunnel
-  
+    - react_deploy
