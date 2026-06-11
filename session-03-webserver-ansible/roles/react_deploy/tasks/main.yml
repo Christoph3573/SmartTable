@@ -4,12 +4,10 @@
     path: "{{ app_path }}"
     state: directory
 
-- name: Pull latest code from git
-  git:
-    repo: "{{ repo_url }}"
-    dest: "{{ app_path }}"
-    version: main
-    force: yes
+- name: Pull latest code (safe mode)
+  command: git pull origin main
+  args:
+    chdir: /opt/check24app
 
 - name: Clean webroot
   file:
