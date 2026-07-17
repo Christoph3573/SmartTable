@@ -12,28 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Build frontend
-        working-directory: apps/codeclub-ui
-        run: |
-          npm ci
-          npm run build
-        env:
-          VITE_API_BASE: ""
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26"
-
-      - name: Build backend (arm64)
-        working-directory: apps/schulapp-backend
-        run: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/schulapp-linux-arm64 ./cmd/server
-
       - name: Install Ansible
         run: |
           pip install ansible
@@ -66,37 +44,14 @@ jobs:
         working-directory: session-03-webserver-ansible
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-christoph \
-            -e backend_binary_src="$GITHUB_WORKSPACE/apps/schulapp-backend/bin/schulapp-linux-arm64" \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
-            -e caddy_frontend_src="$GITHUB_WORKSPACE/apps/codeclub-ui/dist/"
+            -e frontend_repo_src="$GITHUB_WORKSPACE/apps/codeclub-ui"
 
   deploy-emanuel:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Build frontend
-        working-directory: apps/codeclub-ui
-        run: |
-          npm ci
-          npm run build
-        env:
-          VITE_API_BASE: ""
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26"
-
-      - name: Build backend (amd64)
-        working-directory: apps/schulapp-backend
-        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/schulapp-linux-amd64 ./cmd/server
 
       - name: Install Ansible
         run: |
@@ -133,6 +88,5 @@ jobs:
         working-directory: session-03-webserver-ansible
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-emanuel \
-            -e backend_binary_src="$GITHUB_WORKSPACE/apps/schulapp-backend/bin/schulapp-linux-amd64" \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
-            -e caddy_frontend_src="$GITHUB_WORKSPACE/apps/codeclub-ui/dist/"
+            -e frontend_repo_src="$GITHUB_WORKSPACE/apps/codeclub-ui"

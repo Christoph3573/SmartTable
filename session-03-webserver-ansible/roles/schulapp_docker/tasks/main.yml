@@ -1,0 +1,106 @@
+---
+- name: Docker installieren (falls noch nicht vorhanden)
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+    update_cache: true
+
+- name: Docker-Dienst aktivieren
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: pip installieren (für Docker Python SDK)
+  ansible.builtin.apt:
+    name: python3-pip
+    state: present
+
+- name: Docker Python SDK installieren
+  ansible.builtin.pip:
+    name: docker
+    state: present
+    break_system_packages: true
+
+- name: Caddy stoppen und deaktivieren (wird durch Nginx in Docker ersetzt)
+  ansible.builtin.systemd:
+    name: caddy
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Altes schulapp-backend stoppen und deaktivieren (wird durch Docker ersetzt)
+  ansible.builtin.systemd:
+    name: schulapp
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Alte Docker-Container entfernen (schulapp-postgres)
+  community.docker.docker_container:
+    name: "{{ postgres_container_name | default('schulapp-postgres') }}"
+    state: absent
+  failed_when: false
+
+- name: Altes Docker-Netzwerk und Volume entfernen (werden von compose verwaltet)
+  community.docker.docker_network:
+    name: "{{ postgres_network_name | default('schulapp_net') }}"
+    state: absent
+  failed_when: false
+
+- name: Projektverzeichnis anlegen
+  ansible.builtin.file:
+    path: "{{ schulapp_project_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: docker-compose.yml aus Template erzeugen
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ schulapp_project_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: .env-Datei aus Template erzeugen
+  ansible.builtin.template:
+    src: schulapp.env.j2
+    dest: "{{ schulapp_env_file }}"
+    mode: "0600"
+
+- name: Backend-Quellcode kopieren (für Docker-Build + Migrations)
+  ansible.builtin.copy:
+    src: "{{ backend_repo_src }}/"
+    dest: "{{ schulapp_project_dir }}/backend/"
+    mode: "0755"
+    directory_mode: "0755"
+
+- name: Frontend-Quellcode kopieren (für Docker-Build)
+  ansible.builtin.copy:
+    src: "{{ frontend_repo_src }}/"
+    dest: "{{ schulapp_project_dir }}/frontend/"
+    mode: "0755"
+    directory_mode: "0755"
+
+- name: Docker-Compose ausführen (bauen + starten)
+  community.docker.docker_compose_v2:
+    project_src: "{{ schulapp_project_dir }}"
+    env_file: "{{ schulapp_env_file }}"
+    state: present
+    build: always
+    recreate: always
+  register: compose_result
+
+- name: Warten bis Backend bereit ist (Health-Check)
+  ansible.builtin.uri:
+    url: "http://localhost/api/v1/auth/login"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body: '{"email":"admin@schule.de","password":"admin123"}'
+    status_code:
+      - 200
+      - 401
+  register: backend_check
+  until: backend_check.status in [200, 401]
+  retries: 10
+  delay: 3

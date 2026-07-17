@@ -1,0 +1,3 @@
+schulapp_project_dir: /opt/schulapp/docker
+schulapp_env_file: /opt/schulapp/.env
+frontend_repo_src: "{{ playbook_dir }}/../../apps/codeclub-ui"

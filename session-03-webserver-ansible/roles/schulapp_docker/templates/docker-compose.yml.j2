@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-schulapp}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-schulapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-schulapp}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -22,10 +22,10 @@ services:
       - -path
       - /migrations
       - -database
-      - postgres://${POSTGRES_USER:-schulapp}:${POSTGRES_PASSWORD:-schulapp}@postgres:5432/${POSTGRES_DB:-schulapp}?sslmode=disable
+      - postgres://${POSTGRES_USER:-schulapp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-schulapp}?sslmode=disable
       - up
     volumes:
-      - ./apps/schulapp-backend/migrations:/migrations
+      - ./backend/migrations:/migrations
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,10 +33,10 @@ services:
 
   backend:
     build:
-      context: ./apps/schulapp-backend
+      context: ./backend
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-schulapp}:${POSTGRES_PASSWORD:-schulapp}@postgres:5432/${POSTGRES_DB:-schulapp}?sslmode=disable
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DATABASE_URL: postgres://${POSTGRES_USER:-schulapp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-schulapp}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
       PORT: "8080"
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
     depends_on:
@@ -48,7 +48,7 @@ services:
 
   frontend:
     build:
-      context: ./apps/codeclub-ui
+      context: ./frontend
       args:
         VITE_API_BASE: ""
     depends_on:
