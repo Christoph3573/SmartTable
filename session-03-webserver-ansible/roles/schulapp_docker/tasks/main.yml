@@ -80,14 +80,24 @@
     mode: "0755"
     directory_mode: "0755"
 
-- name: Belegte TCP-Ports anzeigen (Debug, vor Compose-Start)
-  ansible.builtin.shell: "ss -H -tln 2>&1 || true"
+- name: Belegte TCP-Ports mit Prozess anzeigen (Debug, vor Compose-Start)
+  ansible.builtin.shell: "ss -H -tlnp 2>&1 || true"
   register: all_ports_proc
   changed_when: false
 
 - name: Ports ausgeben
   ansible.builtin.debug:
     var: all_ports_proc.stdout_lines
+
+- name: Laufende Docker-Container anzeigen (Debug, vor Compose-Start)
+  ansible.builtin.command: docker ps -a
+  register: docker_ps_pre
+  changed_when: false
+  failed_when: false
+
+- name: Docker-Container ausgeben
+  ansible.builtin.debug:
+    var: docker_ps_pre.stdout_lines
 
 - name: Docker-Compose ausführen (bauen + starten)
   community.docker.docker_compose_v2:
