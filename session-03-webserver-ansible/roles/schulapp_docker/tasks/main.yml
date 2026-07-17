@@ -48,6 +48,17 @@
     state: absent
   failed_when: false
 
+- name: IDs von Containern ermitteln, die unsere Zielports blockieren (z.B. Reste von manuellem Testen)
+  ansible.builtin.shell: >
+    (docker ps -q --filter "publish={{ postgres_host_port }}";
+     docker ps -q --filter "publish={{ tunnel_local_port }}") | sort -u
+  register: port_blocking_containers
+  changed_when: false
+
+- name: Port-blockierende Fremd-Container entfernen
+  ansible.builtin.command: "docker rm -f {{ item }}"
+  loop: "{{ port_blocking_containers.stdout_lines }}"
+
 - name: Projektverzeichnis anlegen
   ansible.builtin.file:
     path: "{{ schulapp_project_dir }}"
