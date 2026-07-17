@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-schulapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-schulapp}
+      POSTGRES_DB: ${POSTGRES_DB:-schulapp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-schulapp} -d ${POSTGRES_DB:-schulapp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./apps/schulapp-backend
+    command:
+      - /usr/local/bin/migrate
+      - -path
+      - /app/migrations
+      - -database
+      - postgres://${POSTGRES_USER:-schulapp}:${POSTGRES_PASSWORD:-schulapp}@postgres:5432/${POSTGRES_DB:-schulapp}?sslmode=disable
+      - up
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: no
+
+  backend:
+    build:
+      context: ./apps/schulapp-backend
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-schulapp}:${POSTGRES_PASSWORD:-schulapp}@postgres:5432/${POSTGRES_DB:-schulapp}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PORT: "8080"
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./apps/codeclub-ui
+      args:
+        VITE_API_BASE: ""
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3000:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:
