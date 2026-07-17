@@ -45,6 +45,25 @@
     - daemon-reload
     - restart schulapp
 
+- name: Prüfen was auf backend_port lauscht (Debug)
+  ansible.builtin.shell: "ss -H -tlnp 'sport = :{{ backend_port }}' 2>&1 || true"
+  register: port_occupant
+  changed_when: false
+
+- name: Port-Belegung ausgeben
+  ansible.builtin.debug:
+    var: port_occupant.stdout_lines
+
+- name: Aktuellen Caddy-Zustand zeigen (Debug)
+  ansible.builtin.command: systemctl status caddy --no-pager -l
+  register: caddy_status
+  changed_when: false
+  failed_when: false
+
+- name: Caddy-Status ausgeben
+  ansible.builtin.debug:
+    var: caddy_status.stdout_lines
+
 - name: Service aktivieren und starten
   ansible.builtin.systemd:
     name: schulapp
