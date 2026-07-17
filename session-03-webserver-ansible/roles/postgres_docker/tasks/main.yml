@@ -1,0 +1,86 @@
+---
+- name: Docker installieren
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+    update_cache: true
+
+- name: Docker-Dienst aktivieren
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: pip installieren (für Docker Python SDK)
+  ansible.builtin.apt:
+    name: python3-pip
+    state: present
+
+- name: Docker Python SDK installieren (von community.docker Modulen benötigt)
+  ansible.builtin.pip:
+    name: docker
+    state: present
+    break_system_packages: true
+
+# Isolations-Check: der gewählte Host-Port darf nicht schon von einem ANDEREN
+# Prozess/Container belegt sein (auf pi-emanuel läuft bereits eine separate
+# Postgres-Instanz für andere Zwecke — die darf nicht kollidieren).
+- name: Prüfen ob postgres_host_port schon belegt ist
+  ansible.builtin.shell:
+    cmd: "ss -H -tln 'sport = :{{ postgres_host_port }}' | grep -q ."
+  register: port_check
+  changed_when: false
+  failed_when: false
+
+- name: Prüfen ob Belegung von unserem eigenen Container stammt
+  community.docker.docker_container_info:
+    name: "{{ postgres_container_name }}"
+  register: existing_container
+  when: port_check.rc == 0
+
+- name: Abbrechen wenn Port von fremdem Prozess belegt ist
+  ansible.builtin.fail:
+    msg: >
+      Port {{ postgres_host_port }} ist bereits belegt und gehört nicht zu
+      {{ postgres_container_name }}. Vermutlich läuft hier schon ein anderer
+      Dienst (z.B. eine andere Postgres-Instanz). Setze postgres_host_port in
+      host_vars auf einen freien Port, statt die bestehende Instanz zu stören.
+  when:
+    - port_check.rc == 0
+    - not existing_container.exists | default(false)
+
+- name: Docker-Netzwerk für Schulapp anlegen
+  community.docker.docker_network:
+    name: "{{ postgres_network_name }}"
+    state: present
+
+- name: Docker-Volume für Postgres-Daten anlegen
+  community.docker.docker_volume:
+    name: "{{ postgres_volume_name }}"
+    state: present
+
+- name: Postgres-Container starten
+  community.docker.docker_container:
+    name: "{{ postgres_container_name }}"
+    image: "{{ postgres_image }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ postgres_network_name }}"
+    published_ports:
+      - "127.0.0.1:{{ postgres_host_port }}:5432"
+    volumes:
+      - "{{ postgres_volume_name }}:/var/lib/postgresql/data"
+    env:
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      POSTGRES_DB: "{{ postgres_db }}"
+
+- name: Warten bis Postgres bereit ist
+  ansible.builtin.command:
+    cmd: "docker exec {{ postgres_container_name }} pg_isready -U {{ postgres_user }}"
+  register: pg_ready
+  changed_when: false
+  until: pg_ready.rc == 0
+  retries: 10
+  delay: 3

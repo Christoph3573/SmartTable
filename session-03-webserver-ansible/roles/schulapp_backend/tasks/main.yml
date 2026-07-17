@@ -1,0 +1,64 @@
+---
+- name: Service-User anlegen
+  ansible.builtin.user:
+    name: schulapp
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+
+- name: Verzeichnisse anlegen
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: schulapp
+    group: schulapp
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /opt/schulapp/bin, mode: "0750" }
+    - { path: /etc/schulapp, mode: "0700" }
+    - { path: /var/lib/schulapp/uploads, mode: "0750" }
+
+- name: Binary kopieren
+  ansible.builtin.copy:
+    src: "{{ backend_binary_src }}"
+    dest: /opt/schulapp/bin/schulapp
+    owner: schulapp
+    group: schulapp
+    mode: "0755"
+  notify: restart schulapp
+
+- name: .env-Datei templaten
+  ansible.builtin.template:
+    src: schulapp.env.j2
+    dest: /etc/schulapp/schulapp.env
+    owner: schulapp
+    group: schulapp
+    mode: "0600"
+  notify: restart schulapp
+
+- name: systemd-Unit templaten
+  ansible.builtin.template:
+    src: schulapp.service.j2
+    dest: /etc/systemd/system/schulapp.service
+    mode: "0644"
+  notify:
+    - daemon-reload
+    - restart schulapp
+
+- name: Service aktivieren und starten
+  ansible.builtin.systemd:
+    name: schulapp
+    enabled: true
+    state: started
+
+- name: Handler jetzt ausführen (damit der Smoke-Test frisch gestartete Binary trifft)
+  ansible.builtin.meta: flush_handlers
+
+- name: Smoke-Test /health
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ backend_port }}/health"
+    status_code: 200
+  register: health_check
+  until: health_check.status == 200
+  retries: 5
+  delay: 2

@@ -1,0 +1,16 @@
+[Unit]
+Description=Schulapp Backend (Go)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=schulapp
+Group=schulapp
+EnvironmentFile=/etc/schulapp/schulapp.env
+ExecStart=/opt/schulapp/bin/schulapp
+WorkingDirectory=/opt/schulapp
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

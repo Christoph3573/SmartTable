@@ -1,0 +1,11 @@
+---
+# Eigener Namespace für die Schulapp-Postgres-Instanz — teilt sich nichts mit
+# anderen Diensten, die auf dem Host laufen (Container-Name, Netz, Volume, Port, DB-User).
+postgres_container_name: schulapp-postgres
+postgres_network_name: schulapp_net
+postgres_volume_name: schulapp_pgdata
+postgres_image: "postgres:16-alpine"
+postgres_host_port: 5432
+postgres_user: schulapp
+postgres_db: schulapp
+# postgres_password kommt aus host_vars/<host>/vars.yml (referenziert vault_postgres_password)

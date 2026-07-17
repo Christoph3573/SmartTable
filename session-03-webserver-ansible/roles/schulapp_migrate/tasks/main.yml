@@ -1,0 +1,37 @@
+---
+# Läuft nach postgres_docker, vor schulapp_backend. Idempotent: golang-migrate
+# trackt den Versionsstand in schema_migrations, "up" ist bei jedem Deploy
+# sicher erneut ausführbar.
+
+- name: Migrations-Verzeichnis auf dem Host anlegen
+  ansible.builtin.file:
+    path: /opt/schulapp/migrations
+    state: directory
+    mode: "0755"
+
+- name: Migrationsdateien kopieren
+  ansible.builtin.copy:
+    src: "{{ backend_repo_src }}/migrations/"
+    dest: /opt/schulapp/migrations/
+    mode: "0644"
+
+- name: Migration ausführen (migrate/migrate Container)
+  community.docker.docker_container:
+    name: schulapp-migrate
+    image: "migrate/migrate:v4.17.0"
+    state: started
+    networks:
+      - name: "{{ postgres_network_name }}"
+    volumes:
+      - "/opt/schulapp/migrations:/migrations:ro"
+    command: >-
+      -path=/migrations
+      -database postgres://{{ postgres_user }}:{{ postgres_password }}@{{ postgres_container_name }}:5432/{{ postgres_db }}?sslmode=disable
+      up
+    cleanup: true
+    detach: false
+  register: migrate_result
+
+- name: Migration-Output anzeigen
+  ansible.builtin.debug:
+    msg: "{{ migrate_result.container.Output | default('kein Output') }}"

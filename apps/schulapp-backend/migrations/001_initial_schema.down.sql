@@ -1,0 +1,15 @@
+DROP TABLE IF EXISTS homework_submissions;
+DROP TABLE IF EXISTS homework;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS chat_members;
+DROP TABLE IF EXISTS chat_channels;
+DROP TABLE IF EXISTS files;
+DROP TABLE IF EXISTS file_folders;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS substitutions;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS subjects;
+DROP TABLE IF EXISTS class_teachers;
+DROP TABLE IF EXISTS class_members;
+DROP TABLE IF EXISTS classes;
+DROP TABLE IF EXISTS users;

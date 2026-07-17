@@ -1,0 +1,7 @@
+---
+# Default: die Trainings-Demo-Site aus session-03-webserver-ansible/site/.
+# Der echte Schulapp-Deploy überschreibt beide via -e beim ansible-playbook-Aufruf,
+# damit nie gebauter Output ins Repo committet werden muss.
+caddy_frontend_src: "{{ playbook_dir }}/site/"
+caddy_site_root: /var/www/mysite
+backend_port: 8080

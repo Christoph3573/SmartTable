@@ -1,8 +1,10 @@
 ---
-- name: Session 03 Ansible-Gerüst
+- name: Session 03 Ansible-Gerüst + Schulapp-Deploy
   hosts: webservers
   become: true
   roles:
+    - postgres_docker
+    - schulapp_migrate
+    - schulapp_backend
     - caddy
     - ssh_tunnel
-  

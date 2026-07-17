@@ -1,12 +1,17 @@
 # The Caddyfile is an easy way to configure your Caddy web server.
 #
-# Unless the file starts with a global options block, the first
-# uncommented line is always the address of your site.
-#
-# To use your own domain name (with automatic HTTPS), first make
-# sure your domain's A/AAAA DNS records are properly pointed to
-# this machine's public IP, then replace ":80" below with your
-:8080 {
-    root * /var/www/mysite
-    file_server
+# :{{ tunnel_local_port }} statt eines Literal-Ports — muss zum lokalen Ende
+# des Reverse-Tunnels dieses Hosts passen (siehe host_vars/<host>/vars.yml).
+:{{ tunnel_local_port }} {
+    encode gzip
+
+    handle /api/* {
+        reverse_proxy 127.0.0.1:{{ backend_port }}
+    }
+
+    handle {
+        root * {{ caddy_site_root }}
+        try_files {path} /index.html
+        file_server
+    }
 }

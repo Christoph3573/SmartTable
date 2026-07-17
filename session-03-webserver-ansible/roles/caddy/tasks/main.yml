@@ -9,19 +9,41 @@
     src: Caddyfile.j2
     dest: /etc/caddy/Caddyfile
     mode: "0644"
+  notify: reload caddy
 
-- name: Copy site/ auf den Server
+- name: Zielverzeichnis für die Site anlegen
+  ansible.builtin.file:
+    path: "{{ caddy_site_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+
+- name: Vorherigen Site-Inhalt leeren (kein Rest von alten Deploys)
+  ansible.builtin.file:
+    path: "{{ caddy_site_root }}"
+    state: "{{ item }}"
+    owner: www-data
+    group: www-data
+    mode: "0755"
+  loop: [absent, directory]
+
+- name: Site-Dateien auf den Server kopieren
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/site/"
-    dest: "/var/www/mysite/"
+    src: "{{ caddy_frontend_src }}"
+    dest: "{{ caddy_site_root }}/"
     owner: www-data
     group: www-data
     mode: "0644"
     directory_mode: "0755"
+  notify: reload caddy
 
 - name: Validate caddy config
   ansible.builtin.command: caddy validate --config /etc/caddy/Caddyfile
   changed_when: false
+
+- name: Handler jetzt ausführen (Config/Content sofort aktiv)
+  ansible.builtin.meta: flush_handlers
 
 - name: Ensure caddy is running
   ansible.builtin.service:

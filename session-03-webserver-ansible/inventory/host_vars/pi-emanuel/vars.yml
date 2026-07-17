@@ -4,3 +4,10 @@ tunnel_remote_user: tunnel-emanuel
 tunnel_remote_host: codeclub.check24.fun
 tunnel_remote_port: 16767
 tunnel_local_port: 8080
+
+# Schulapp (Prod) — eigener Namespace, siehe roles/postgres_docker/defaults.
+# Port bewusst NICHT 5432: auf diesem Host läuft bereits eine andere
+# Postgres-Instanz für andere Zwecke, die Schulapp darf sie nicht stören.
+postgres_host_port: 5433
+jwt_secret: "1ac3ffa6d5ed69d0b3a218584d9fd12a5656b47bb7a747eaf42f70bac12f8a1d"
+postgres_password: "Qxz4uvSTh4ZaSg8tJBvs9kFcm0FL1JYE"
