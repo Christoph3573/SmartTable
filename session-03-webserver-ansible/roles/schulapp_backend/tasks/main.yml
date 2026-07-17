@@ -54,6 +54,30 @@
 - name: Handler jetzt ausführen (damit der Smoke-Test frisch gestartete Binary trifft)
   ansible.builtin.meta: flush_handlers
 
+- name: Kurz warten bis der Prozess hochkommt
+  ansible.builtin.pause:
+    seconds: 2
+
+- name: Service-Status anzeigen (Debug)
+  ansible.builtin.command: systemctl status schulapp --no-pager -l
+  register: svc_status
+  changed_when: false
+  failed_when: false
+
+- name: Status ausgeben
+  ansible.builtin.debug:
+    var: svc_status.stdout_lines
+
+- name: Letzte Logs anzeigen (Debug)
+  ansible.builtin.command: journalctl -u schulapp -n 50 --no-pager
+  register: svc_logs
+  changed_when: false
+  failed_when: false
+
+- name: Logs ausgeben
+  ansible.builtin.debug:
+    var: svc_logs.stdout_lines
+
 - name: Smoke-Test /health
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ backend_port }}/health"
