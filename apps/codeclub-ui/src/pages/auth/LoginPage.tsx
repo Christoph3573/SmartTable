@@ -71,10 +71,6 @@ export function LoginPage() {
           </Button>
         </form>
       </div>
-
-      <p className="mt-4 text-center text-xs text-gray-400">
-        SchulApp — Sicher und datenschutzkonform
-      </p>
     </div>
   );
 }
