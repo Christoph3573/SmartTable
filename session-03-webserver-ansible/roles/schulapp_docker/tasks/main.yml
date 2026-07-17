@@ -80,10 +80,20 @@
     mode: "0755"
     directory_mode: "0755"
 
+- name: Belegte TCP-Ports anzeigen (Debug, vor Compose-Start)
+  ansible.builtin.shell: "ss -H -tln 2>&1 || true"
+  register: all_ports_proc
+  changed_when: false
+
+- name: Ports ausgeben
+  ansible.builtin.debug:
+    var: all_ports_proc.stdout_lines
+
 - name: Docker-Compose ausführen (bauen + starten)
   community.docker.docker_compose_v2:
     project_src: "{{ schulapp_project_dir }}"
-    env_file: "{{ schulapp_env_file }}"
+    env_files:
+      - "{{ schulapp_env_file }}"
     state: present
     build: always
     recreate: always
@@ -91,7 +101,7 @@
 
 - name: Warten bis Backend bereit ist (Health-Check)
   ansible.builtin.uri:
-    url: "http://localhost/api/v1/auth/login"
+    url: "http://localhost:{{ tunnel_local_port }}/api/v1/auth/login"
     method: POST
     headers:
       Content-Type: "application/json"

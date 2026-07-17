@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:{{ postgres_host_port }}:5432"
     restart: unless-stopped
 
   migrate:
@@ -54,7 +54,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "127.0.0.1:{{ tunnel_local_port }}:80"
     restart: unless-stopped
 
 volumes:
