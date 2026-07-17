@@ -5,6 +5,6 @@
   roles:
     - postgres_docker
     - schulapp_migrate
-    - schulapp_backend
     - caddy
+    - schulapp_backend
     - ssh_tunnel
