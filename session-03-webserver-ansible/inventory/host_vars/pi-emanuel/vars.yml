@@ -6,8 +6,11 @@ tunnel_remote_port: 16767
 tunnel_local_port: 8080
 
 # Schulapp (Prod) — eigener Namespace, siehe roles/postgres_docker/defaults.
-# Port bewusst NICHT 5432: auf diesem Host läuft bereits eine andere
-# Postgres-Instanz für andere Zwecke, die Schulapp darf sie nicht stören.
-postgres_host_port: 5433
+# Dieser Host ist voll mit anderen Diensten (Grafana/Prometheus/Loki/Redis/
+# Mailserver + zwei weitere Postgres-Instanzen auf 5432 UND 5433, und *:8080
+# ist schon die bestehende Caddy-Instanz). Bewusst unübliche freie Ports,
+# per `ss -tln` auf dem Host verifiziert (siehe Deploy-Log).
+postgres_host_port: 25432
+backend_port: 28080
 jwt_secret: "1ac3ffa6d5ed69d0b3a218584d9fd12a5656b47bb7a747eaf42f70bac12f8a1d"
 postgres_password: "Qxz4uvSTh4ZaSg8tJBvs9kFcm0FL1JYE"
