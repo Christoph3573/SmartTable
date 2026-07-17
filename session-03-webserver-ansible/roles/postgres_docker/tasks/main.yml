@@ -62,6 +62,21 @@
   register: existing_container
   when: port_check.rc == 0
 
+- name: Alle belegten TCP-Ports anzeigen (Debug, falls Konflikt)
+  ansible.builtin.command: ss -H -tln
+  register: all_ports
+  changed_when: false
+  when:
+    - port_check.rc == 0
+    - not existing_container.exists | default(false)
+
+- name: Belegte Ports ausgeben
+  ansible.builtin.debug:
+    var: all_ports.stdout_lines
+  when:
+    - port_check.rc == 0
+    - not existing_container.exists | default(false)
+
 - name: Abbrechen wenn Port von fremdem Prozess belegt ist
   ansible.builtin.fail:
     msg: >
