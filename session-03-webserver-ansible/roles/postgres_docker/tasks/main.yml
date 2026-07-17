@@ -1,9 +1,33 @@
 ---
-- name: Docker installieren
+# Absicherung: falls ein vorheriger apt-Lauf mittendrin abgebrochen ist
+# (z.B. Paketkonflikt), dpkg/apt in einen sauberen Zustand bringen bevor
+# irgendwas anderes versucht wird.
+- name: Angebrochene dpkg-Transaktionen abschließen
+  ansible.builtin.command: dpkg --configure -a
+  changed_when: false
+  failed_when: false
+
+- name: Kaputte apt-Abhängigkeiten reparieren
+  ansible.builtin.apt:
+    state: fixed
+  changed_when: false
+  failed_when: false
+
+# Docker kann bereits vorhanden sein (z.B. Docker CE aus dem offiziellen
+# docker.com-Repo statt Debians docker.io) — nicht blind drüberinstallieren,
+# das kollidiert paketseitig (docker-buildx vs. docker-buildx-plugin).
+- name: Prüfen ob Docker schon installiert ist
+  ansible.builtin.command: docker --version
+  register: docker_check
+  changed_when: false
+  failed_when: false
+
+- name: Docker installieren (nur falls noch nicht vorhanden)
   ansible.builtin.apt:
     name: docker.io
     state: present
     update_cache: true
+  when: docker_check.rc != 0
 
 - name: Docker-Dienst aktivieren
   ansible.builtin.service:
