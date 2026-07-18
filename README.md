@@ -1,26 +1,16 @@
-# CHECK24 Code Club
+# Smart Table
 
-Begleitmaterial und Ansible-Setups für den internen Code Club, plus die Schulapp (eigenständiges Projekt) inklusive automatischem Deploy.
+`apps/codeclub-ui` (React 19 + Vite + TS) und `apps/schulapp-backend` (Go + chi + Postgres) — Roadmap und Architektur-Docs in [`docs/`](docs/).
 
-## Schulapp
-
-`apps/codeclub-ui` (React 19 + Vite + TS) und `apps/schulapp-backend` (Go + chi + Postgres) sind die Schulapp — Roadmap und Architektur-Docs in [`docs/`](docs/).
-
-**Deploy:** Push nach `develop` deployt auf **pi-christoph** (Dev), Push nach `main` auf **pi-emanuel** (Prod). Jeder Host hat eine komplett eigenständige Postgres-Instanz (eigener Docker-Container/Netz/Volume/Port/DB-User — siehe `session-03-webserver-ansible/roles/postgres_docker/`), damit sich Dev/Prod und ggf. andere Dienste auf dem Host nicht in die Quere kommen.
+**Deploy:** Push nach `develop` deployt auf **pi-christoph** (Dev), Push nach `main` auf **pi-emanuel** (Prod). Jeder Host hat eine komplett eigenständige Postgres-Instanz (eigener Docker-Container/Netz/Volume/Port/DB-User — siehe `deploy/roles/postgres_docker/`), damit sich Dev/Prod und ggf. andere Dienste auf dem Host nicht in die Quere kommen.
 
 Pipeline pro Deploy: Frontend bauen (`vite build`) → Backend für die Pi-Architektur cross-compilen (Go) → Ansible: Postgres-Container hoch → Migrationen laufen lassen → Go-Binary als systemd-Service deployen → Caddy liefert `dist/` aus und reverse-proxied `/api/*` aufs Backend.
 
 Rollout ist bewusst inkrementell nach der 8-Phasen-Roadmap (siehe `docs/`) — jede Phase bleibt für sich deploybar und wird einzeln verifiziert, bevor die nächste startet.
 
-## Sessions
+## Deployment-Infrastruktur
 
-| Session | Thema | Verzeichnis |
-|---------|-------|-------------|
-| 03 | Webserver + Ansible (+ Schulapp-Deploy) | [`session-03-webserver-ansible/`](session-03-webserver-ansible/) |
-
-## Session 03 — Webserver + Ansible
-
-Ziel: Eine statische Website per Ansible auf einem Raspberry Pi deployen und über einen SSH-Reverse-Tunnel ins Internet bringen.
+Die Ansible-Playbooks und Rollen für den Raspberry-Pi-Deploy liegen in [`deploy/`](deploy/).
 
 ### Architektur
 
@@ -28,7 +18,7 @@ Ziel: Eine statische Website per Ansible auf einem Raspberry Pi deployen und üb
 Laptop  ──ansible──►  Raspberry Pi
                            │
                     [Caddy :80]
-                    [autossh] ──tunnel──►  codeclub.check24.fun
+                    [autossh] ──tunnel──►  smart-table.example.com
                                                 │
                                            öffentlich erreichbar
 ```
@@ -43,7 +33,7 @@ Laptop  ──ansible──►  Raspberry Pi
 ### Schnellstart
 
 ```bash
-cd session-03-webserver-ansible/
+cd deploy/
 
 # Inventory anpassen
 # inventory/hosts  →  ansible_host / ansible_user auf den eigenen Pi setzen
@@ -65,7 +55,7 @@ ansible-playbook deploy.yml
 ### Projektstruktur
 
 ```
-session-03-webserver-ansible/
+deploy/
 ├── deploy.yml                    # Haupt-Playbook (caddy + ssh_tunnel)
 ├── provision.yml                 # Optionales zweites Playbook-Gerüst
 ├── inventory/
@@ -82,4 +72,10 @@ session-03-webserver-ansible/
 
 ### Secrets
 
-Keine neuen GitHub Secrets nötig — der Schulapp-Deploy läuft über die bereits vorhandenen SSH-Secrets (`SSH_PRIVATE_KEY`, `VM_HOST`, `VM_USER`, `PI_TUNNEL_PORT`, `PI_USER`, `EMANUEL_*`). `jwt_secret` und `postgres_password` liegen direkt in `inventory/host_vars/<host>/vars.yml` (pro Host unterschiedlich, nicht geteilt). Kein `ansible-vault` im Einsatz.
+Keine neuen GitHub Secrets nötig — der Deploy läuft über die bereits vorhandenen SSH-Secrets (`SSH_PRIVATE_KEY`, `VM_HOST`, `VM_USER`, `PI_TUNNEL_PORT`, `PI_USER`, `EMANUEL_*`). `jwt_secret` und `postgres_password` liegen direkt in `inventory/host_vars/<host>/vars.yml` (pro Host unterschiedlich, nicht geteilt). Kein `ansible-vault` im Einsatz.
+
+## Lokale Entwicklung
+
+```bash
+docker compose up -d
+```

@@ -41,7 +41,7 @@ jobs:
           EOF
 
       - name: Run Ansible Playbook
-        working-directory: session-03-webserver-ansible
+        working-directory: deploy
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-christoph \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
@@ -85,7 +85,7 @@ jobs:
         run: ssh -o BatchMode=yes pi-emanuel 'echo connected as $(whoami) on $(hostname)'
 
       - name: Run Ansible Playbook
-        working-directory: session-03-webserver-ansible
+        working-directory: deploy
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-emanuel \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
