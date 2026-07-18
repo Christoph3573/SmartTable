@@ -77,10 +77,7 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-      <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-600">
-          <span className="text-sm font-bold text-white">S</span>
-        </div>
+      <div className="flex h-16 items-center border-b border-gray-200 px-6 dark:border-gray-700">
         <span className="font-semibold text-gray-900 dark:text-white">SchulApp</span>
       </div>
 

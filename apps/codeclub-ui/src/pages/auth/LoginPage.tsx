@@ -26,15 +26,9 @@ export function LoginPage() {
     <div className="w-full max-w-sm">
       <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-lg dark:border-gray-700 dark:bg-gray-900">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-indigo-600">
-            <span className="text-xl font-bold text-white">S</span>
-          </div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Anmelden
+            Login
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Willkommen bei SchulApp
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
