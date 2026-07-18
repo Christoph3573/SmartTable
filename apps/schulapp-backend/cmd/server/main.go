@@ -89,16 +89,6 @@ func main() {
 }
 
 func seedAdminUser(db *sql.DB) {
-	var exists bool
-	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = 'admin@schule.de')`).Scan(&exists)
-	if err != nil {
-		log.Printf("seed: Fehler beim Prüfen auf Admin-User: %v", err)
-		return
-	}
-	if exists {
-		return
-	}
-
 	hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), 12)
 	if err != nil {
 		log.Printf("seed: Fehler beim Hash-Generieren: %v", err)
@@ -106,12 +96,17 @@ func seedAdminUser(db *sql.DB) {
 	}
 
 	_, err = db.Exec(
-		`INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES ($1, $2, $3, $4, $5)`,
+		`INSERT INTO users (email, password_hash, first_name, last_name, role, active)
+		 VALUES ($1, $2, $3, $4, $5, true)
+		 ON CONFLICT (email) DO UPDATE SET
+		   password_hash = EXCLUDED.password_hash,
+		   role = 'admin',
+		   active = true`,
 		"admin@schule.de", string(hash), "Admin", "Schule", "admin",
 	)
 	if err != nil {
-		log.Printf("seed: Fehler beim Anlegen des Admin-Users: %v", err)
+		log.Printf("seed: Fehler beim Anlegen/Updaten des Admin-Users: %v", err)
 		return
 	}
-	log.Println("seed: Admin-User angelegt (admin@schule.de / admin123)")
+	log.Println("seed: Admin-User sichergestellt (admin@schule.de / admin123)")
 }
