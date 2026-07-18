@@ -102,19 +102,28 @@
     dest: "{{ schulapp_env_file }}"
     mode: "0600"
 
+- name: rsync installieren (für synchronize-Modul)
+  ansible.builtin.apt:
+    name: rsync
+    state: present
+
 - name: Backend-Quellcode kopieren (für Docker-Build + Migrations)
-  ansible.builtin.copy:
+  ansible.posix.synchronize:
     src: "{{ backend_repo_src }}/"
     dest: "{{ schulapp_project_dir }}/backend/"
-    mode: "0755"
-    directory_mode: "0755"
+    rsync_opts:
+      - "--exclude=.git"
+    delete: true
 
 - name: Frontend-Quellcode kopieren (für Docker-Build)
-  ansible.builtin.copy:
+  ansible.posix.synchronize:
     src: "{{ frontend_repo_src }}/"
     dest: "{{ schulapp_project_dir }}/frontend/"
-    mode: "0755"
-    directory_mode: "0755"
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=node_modules"
+      - "--exclude=dist"
+    delete: true
 
 - name: Belegte TCP-Ports mit Prozess anzeigen (Debug, vor Compose-Start)
   ansible.builtin.shell: "ss -H -tlnp 2>&1 || true"
