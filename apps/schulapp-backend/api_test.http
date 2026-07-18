@@ -1,0 +1,87 @@
+### Health Check (ohne Auth)
+GET http://localhost:8080/health
+
+### Health Check (API)
+GET http://localhost:8080/api/v1/health
+
+### Login (erfolgreich)
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@schule.de",
+  "password": "admin123"
+}
+
+### Login (falsches Passwort)
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@schule.de",
+  "password": "falsch"
+}
+
+### Login (fehlende Felder)
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{}
+
+### Login Rate Limit (5x schnell hintereinander)
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "x@y.de",
+  "password": "x"
+}
+
+### Refresh Token
+POST http://localhost:8080/api/v1/auth/refresh
+
+### Logout
+POST http://localhost:8080/api/v1/auth/logout
+
+### ─── Ab hier JWT erforderlich ───
+@accessToken = PASTE_YOUR_TOKEN_HERE
+
+### Eigenes Profil
+GET http://localhost:8080/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
+
+### Profil aktualisieren
+PATCH http://localhost:8080/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "first_name": "NeuerName"
+}
+
+### Fächer auflisten
+GET http://localhost:8080/api/v1/subjects
+Authorization: Bearer {{accessToken}}
+
+### Fach anlegen
+POST http://localhost:8080/api/v1/subjects
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Mathematik",
+  "short": "MA"
+}
+
+### Fach anlegen (fehlerhaft)
+POST http://localhost:8080/api/v1/subjects
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "",
+  "short": ""
+}
+
+### Ohne Token (401)
+GET http://localhost:8080/api/v1/subjects

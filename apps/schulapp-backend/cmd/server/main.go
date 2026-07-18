@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
+	"schulapp/internal/api"
 	"schulapp/internal/api/handler"
-	appmw "schulapp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -54,8 +54,6 @@ func main() {
 		port = "8080"
 	}
 
-	authHandler := &handler.AuthHandler{DB: db, JWTSecret: jwtSecret}
-
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -75,27 +73,14 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Login-Rate-Limiter: 5 Anfragen pro Minute
-	loginLimiter := rate.NewLimiter(rate.Every(time.Minute/5), 5)
+	srv := &handler.Server{
+		DB:           db,
+		JWTSecret:    jwtSecret,
+		LoginLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5),
+	}
 
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Route("/auth", func(r chi.Router) {
-			r.With(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					if !loginLimiter.Allow() {
-						http.Error(w, `{"error":"zu viele Anfragen"}`, http.StatusTooManyRequests)
-						return
-					}
-					next.ServeHTTP(w, req)
-				})
-			}).Post("/login", authHandler.Login)
-
-			r.Post("/refresh", authHandler.Refresh)
-			r.Post("/logout", authHandler.Logout)
-
-			r.With(appmw.Auth(jwtSecret)).Get("/me", authHandler.Me)
-			r.With(appmw.Auth(jwtSecret)).Patch("/me", authHandler.UpdateMe)
-		})
+	api.HandlerWithOptions(srv, api.ChiServerOptions{
+		BaseRouter: r,
 	})
 
 	addr := fmt.Sprintf(":%s", port)

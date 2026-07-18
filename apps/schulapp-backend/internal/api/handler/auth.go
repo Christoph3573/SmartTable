@@ -6,55 +6,42 @@ import (
 	"net/http"
 	"time"
 
+	"schulapp/internal/api"
 	appmw "schulapp/internal/middleware"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/time/rate"
 )
 
-type AuthHandler struct {
-	DB        *sql.DB
-	JWTSecret []byte
+type Server struct {
+	api.Unimplemented
+
+	DB           *sql.DB
+	JWTSecret    []byte
+	LoginLimiter *rate.Limiter
 }
 
-type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
+func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
+	if !h.LoginLimiter.Allow() {
+		writeError(w, http.StatusTooManyRequests, "zu viele Anfragen")
+		return
+	}
 
-type userResponse struct {
-	ID        int    `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Role      string `json:"role"`
-}
-
-type loginResponse struct {
-	AccessToken string       `json:"access_token"`
-	User        userResponse `json:"user"`
-}
-
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
+	var req api.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "ungültige Anfrage")
 		return
 	}
 
-	var user struct {
-		ID           int
-		Email        string
-		PasswordHash string
-		FirstName    string
-		LastName     string
-		Role         string
-	}
+	var passwordHash string
+	var user api.User
 
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT id, email, password_hash, first_name, last_name, role FROM users WHERE email = $1 AND active = true`,
+		`SELECT password_hash, id, email, first_name, last_name, role
+		 FROM users WHERE email = $1 AND active = true`,
 		req.Email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.FirstName, &user.LastName, &user.Role)
+	).Scan(&passwordHash, &user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Role)
 
 	if err == sql.ErrNoRows {
 		writeError(w, http.StatusUnauthorized, "ungültige Anmeldedaten")
@@ -65,18 +52,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
 		writeError(w, http.StatusUnauthorized, "ungültige Anmeldedaten")
 		return
 	}
 
-	accessToken, err := h.generateAccessToken(user.ID, user.Email, user.Role)
+	accessToken, err := h.generateAccessToken(user.Id, string(user.Email), string(user.Role))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
 		return
 	}
 
-	refreshToken, err := h.generateRefreshToken(user.ID)
+	refreshToken, err := generateRefreshToken(user.Id, h.JWTSecret)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
 		return
@@ -85,7 +72,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 	_, err = h.DB.ExecContext(r.Context(),
 		`INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
-		user.ID, refreshToken, expiresAt,
+		user.Id, refreshToken, expiresAt,
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
@@ -99,22 +86,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  expiresAt,
-		Secure:   r.TLS != nil,
 	})
 
-	writeJSON(w, http.StatusOK, loginResponse{
+	writeJSON(w, http.StatusOK, api.LoginResponse{
 		AccessToken: accessToken,
-		User: userResponse{
-			ID:        user.ID,
-			Email:     user.Email,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Role:      user.Role,
-		},
+		User:        user,
 	})
 }
 
-func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+func (h *Server) PostApiV1AuthRefresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "kein Refresh Token")
@@ -129,7 +109,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	).Scan(&userID, &expiresAt)
 
 	if err == sql.ErrNoRows || time.Now().After(expiresAt) {
-		writeError(w, http.StatusUnauthorized, "abgelaufener Refresh Token")
+		writeError(w, http.StatusUnauthorized, "ungültiger oder abgelaufener Refresh Token")
 		return
 	}
 	if err != nil {
@@ -137,29 +117,26 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user struct {
-		Email string
-		Role  string
-	}
+	var email, role string
 	err = h.DB.QueryRowContext(r.Context(),
 		`SELECT email, role FROM users WHERE id = $1 AND active = true`,
 		userID,
-	).Scan(&user.Email, &user.Role)
+	).Scan(&email, &role)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "ungültige Anmeldedaten")
+		writeError(w, http.StatusUnauthorized, "Benutzer nicht gefunden oder inaktiv")
 		return
 	}
 
-	accessToken, err := h.generateAccessToken(userID, user.Email, user.Role)
+	accessToken, err := h.generateAccessToken(userID, email, role)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"access_token": accessToken})
+	writeJSON(w, http.StatusOK, api.RefreshResponse{AccessToken: accessToken})
 }
 
-func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+func (h *Server) PostApiV1AuthLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err == nil {
 		h.DB.ExecContext(r.Context(),
@@ -177,14 +154,18 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+func (h *Server) GetApiV1AuthMe(w http.ResponseWriter, r *http.Request) {
 	claims := appmw.GetClaims(r)
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "nicht autorisiert")
+		return
+	}
 
-	var user userResponse
+	var user api.User
 	err := h.DB.QueryRowContext(r.Context(),
 		`SELECT id, email, first_name, last_name, role FROM users WHERE id = $1`,
 		claims.UserID,
-	).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.Role)
+	).Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Role)
 
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Benutzer nicht gefunden")
@@ -194,13 +175,14 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, user)
 }
 
-func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+func (h *Server) PatchApiV1AuthMe(w http.ResponseWriter, r *http.Request) {
 	claims := appmw.GetClaims(r)
-
-	var req struct {
-		FirstName *string `json:"first_name"`
-		LastName  *string `json:"last_name"`
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "nicht autorisiert")
+		return
 	}
+
+	var req api.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "ungültige Anfrage")
 		return
@@ -219,10 +201,10 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Me(w, r)
+	h.GetApiV1AuthMe(w, r)
 }
 
-func (h *AuthHandler) generateAccessToken(userID int, email, role string) (string, error) {
+func (h *Server) generateAccessToken(userID int, email, role string) (string, error) {
 	claims := appmw.Claims{
 		UserID: userID,
 		Email:  email,
@@ -235,11 +217,11 @@ func (h *AuthHandler) generateAccessToken(userID int, email, role string) (strin
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.JWTSecret)
 }
 
-func (h *AuthHandler) generateRefreshToken(userID int) (string, error) {
+func generateRefreshToken(userID int, jwtSecret []byte) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   string(rune(userID)),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.JWTSecret)
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtSecret)
 }
