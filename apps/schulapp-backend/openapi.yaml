@@ -1,0 +1,1530 @@
+openapi: "3.0.3"
+info:
+  title: SchulApp API
+  description: API für die Schulverwaltungs-App
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080
+    description: Lokale Entwicklung
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    User:
+      type: object
+      required: [id, email, first_name, last_name, role]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [student, teacher, admin]
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [access_token, user]
+      properties:
+        access_token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    RefreshResponse:
+      type: object
+      required: [access_token]
+      properties:
+        access_token:
+          type: string
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+
+    Class:
+      type: object
+      required: [id, name, school_year]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        school_year:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CreateClassRequest:
+      type: object
+      required: [name, school_year]
+      properties:
+        name:
+          type: string
+        school_year:
+          type: string
+
+    UpdateClassRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        school_year:
+          type: string
+
+    ClassMember:
+      type: object
+      required: [user_id, email, first_name, last_name, role]
+      properties:
+        user_id:
+          type: integer
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [student, teacher, admin]
+
+    ClassTeacher:
+      type: object
+      required: [user_id, email, first_name, last_name, is_home_teacher]
+      properties:
+        user_id:
+          type: integer
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        is_home_teacher:
+          type: boolean
+
+    AddMemberRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+
+    AddTeacherRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+        is_home_teacher:
+          type: boolean
+
+    Subject:
+      type: object
+      required: [id, name, short]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        short:
+          type: string
+
+    CreateSubjectRequest:
+      type: object
+      required: [name, short]
+      properties:
+        name:
+          type: string
+        short:
+          type: string
+
+    Substitution:
+      type: object
+      required: [id, date, period, type]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        period:
+          type: integer
+        class_id:
+          type: integer
+        subject_id:
+          type: integer
+        original_teacher_id:
+          type: integer
+        sub_teacher_id:
+          type: integer
+        room:
+          type: string
+        type:
+          type: string
+          enum: [substitution, cancellation, room_change, extra]
+        note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CreateSubstitutionRequest:
+      type: object
+      required: [date, period, type]
+      properties:
+        date:
+          type: string
+          format: date
+        period:
+          type: integer
+        class_id:
+          type: integer
+        subject_id:
+          type: integer
+        original_teacher_id:
+          type: integer
+        sub_teacher_id:
+          type: integer
+        room:
+          type: string
+        type:
+          type: string
+          enum: [substitution, cancellation, room_change, extra]
+        note:
+          type: string
+
+    UpdateSubstitutionRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        period:
+          type: integer
+        class_id:
+          type: integer
+        subject_id:
+          type: integer
+        original_teacher_id:
+          type: integer
+        sub_teacher_id:
+          type: integer
+        room:
+          type: string
+        type:
+          type: string
+          enum: [substitution, cancellation, room_change, extra]
+        note:
+          type: string
+
+    Event:
+      type: object
+      required: [id, title, start_time, end_time, type]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        all_day:
+          type: boolean
+        type:
+          type: string
+          enum: [holiday, exam, event, other]
+        class_id:
+          type: integer
+        creator_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    CreateEventRequest:
+      type: object
+      required: [title, start_time, end_time, type]
+      properties:
+        title:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        all_day:
+          type: boolean
+        type:
+          type: string
+          enum: [holiday, exam, event, other]
+        class_id:
+          type: integer
+
+    UpdateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        all_day:
+          type: boolean
+        type:
+          type: string
+          enum: [holiday, exam, event, other]
+        class_id:
+          type: integer
+
+    FileFolder:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        parent_id:
+          type: integer
+        class_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    CreateFolderRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        parent_id:
+          type: integer
+
+    File:
+      type: object
+      required: [id, name, size, mime_type]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        size:
+          type: integer
+          format: int64
+        mime_type:
+          type: string
+        uploader_id:
+          type: integer
+        class_id:
+          type: integer
+        folder_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ChatChannel:
+      type: object
+      required: [id, type]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [direct, class, group]
+        class_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    CreateChannelRequest:
+      type: object
+      required: [type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [direct, class, group]
+        class_id:
+          type: integer
+        member_ids:
+          type: array
+          items:
+            type: integer
+
+    Message:
+      type: object
+      required: [id, channel_id, sender_id, content, created_at]
+      properties:
+        id:
+          type: integer
+        channel_id:
+          type: integer
+        sender_id:
+          type: integer
+        content:
+          type: string
+        file_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    SendMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        file_id:
+          type: integer
+
+    Homework:
+      type: object
+      required: [id, title, due_date, class_id, subject_id, teacher_id]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        due_date:
+          type: string
+          format: date
+        class_id:
+          type: integer
+        subject_id:
+          type: integer
+        teacher_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    CreateHomeworkRequest:
+      type: object
+      required: [title, due_date, subject_id]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        due_date:
+          type: string
+          format: date
+        subject_id:
+          type: integer
+
+    UpdateHomeworkRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        due_date:
+          type: string
+          format: date
+        subject_id:
+          type: integer
+
+    HomeworkSubmission:
+      type: object
+      required: [id, homework_id, student_id, status]
+      properties:
+        id:
+          type: integer
+        homework_id:
+          type: integer
+        student_id:
+          type: integer
+        status:
+          type: string
+          enum: [open, submitted, graded]
+        grade:
+          type: number
+          format: float
+        submitted_at:
+          type: string
+          format: date-time
+        graded_at:
+          type: string
+          format: date-time
+
+    GradeSubmissionRequest:
+      type: object
+      required: [grade]
+      properties:
+        grade:
+          type: number
+          format: float
+
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Benutzer anmelden
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Erfolgreiche Anmeldung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Ungültige Anmeldedaten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Access Token erneuern
+      responses:
+        "200":
+          description: Neuer Access Token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "401":
+          description: Ungültiger oder abgelaufener Refresh Token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Abmelden
+      responses:
+        "204":
+          description: Erfolgreich abgemeldet
+
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      summary: Eigenes Profil abrufen
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Benutzerprofil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [auth]
+      summary: Eigenes Profil aktualisieren
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Aktualisiertes Benutzerprofil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/users:
+    get:
+      tags: [users]
+      summary: Alle Benutzer auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Benutzerliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      tags: [users]
+      summary: Benutzer anlegen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "201":
+          description: Benutzer angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /api/v1/users/{id}:
+    get:
+      tags: [users]
+      summary: Benutzer abrufen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Benutzer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      tags: [users]
+      summary: Benutzer aktualisieren
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Aktualisierter Benutzer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      tags: [users]
+      summary: Benutzer löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Benutzer gelöscht
+
+  /api/v1/classes:
+    get:
+      tags: [classes]
+      summary: Klassen auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Klassenliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Class"
+    post:
+      tags: [classes]
+      summary: Klasse anlegen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClassRequest"
+      responses:
+        "201":
+          description: Klasse angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Class"
+
+  /api/v1/classes/{id}:
+    get:
+      tags: [classes]
+      summary: Klasse abrufen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Klasse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Class"
+    patch:
+      tags: [classes]
+      summary: Klasse aktualisieren
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateClassRequest"
+      responses:
+        "200":
+          description: Aktualisierte Klasse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Class"
+    delete:
+      tags: [classes]
+      summary: Klasse löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Klasse gelöscht
+
+  /api/v1/classes/{id}/members:
+    get:
+      tags: [classes]
+      summary: Klassenmitglieder auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Mitgliederliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClassMember"
+    post:
+      tags: [classes]
+      summary: Mitglied hinzufügen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberRequest"
+      responses:
+        "201":
+          description: Mitglied hinzugefügt
+
+  /api/v1/classes/{id}/members/{userId}:
+    delete:
+      tags: [classes]
+      summary: Mitglied entfernen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Mitglied entfernt
+
+  /api/v1/classes/{id}/teachers:
+    get:
+      tags: [classes]
+      summary: Klassenlehrer auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lehrerliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClassTeacher"
+    post:
+      tags: [classes]
+      summary: Lehrer zuweisen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTeacherRequest"
+      responses:
+        "201":
+          description: Lehrer zugewiesen
+
+  /api/v1/classes/{id}/teachers/{userId}:
+    delete:
+      tags: [classes]
+      summary: Lehrer entfernen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Lehrer entfernt
+
+  /api/v1/classes/{id}/homework:
+    get:
+      tags: [homework]
+      summary: Hausaufgaben einer Klasse auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Hausaufgabenliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Homework"
+    post:
+      tags: [homework]
+      summary: Hausaufgabe anlegen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateHomeworkRequest"
+      responses:
+        "201":
+          description: Hausaufgabe angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Homework"
+
+  /api/v1/homework/{id}:
+    patch:
+      tags: [homework]
+      summary: Hausaufgabe aktualisieren
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateHomeworkRequest"
+      responses:
+        "200":
+          description: Aktualisierte Hausaufgabe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Homework"
+    delete:
+      tags: [homework]
+      summary: Hausaufgabe löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Hausaufgabe gelöscht
+
+  /api/v1/homework/{id}/submissions:
+    get:
+      tags: [homework]
+      summary: Abgaben einer Hausaufgabe auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Abgabenliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HomeworkSubmission"
+    post:
+      tags: [homework]
+      summary: Hausaufgabe abgeben
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Abgabe erfolgreich
+
+  /api/v1/submissions/{id}:
+    patch:
+      tags: [homework]
+      summary: Abgabe bewerten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GradeSubmissionRequest"
+      responses:
+        "200":
+          description: Bewertung gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomeworkSubmission"
+
+  /api/v1/substitutions:
+    get:
+      tags: [substitutions]
+      summary: Vertretungen auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: class_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vertretungsliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Substitution"
+    post:
+      tags: [substitutions]
+      summary: Vertretung anlegen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubstitutionRequest"
+      responses:
+        "201":
+          description: Vertretung angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Substitution"
+
+  /api/v1/substitutions/{id}:
+    patch:
+      tags: [substitutions]
+      summary: Vertretung aktualisieren
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubstitutionRequest"
+      responses:
+        "200":
+          description: Aktualisierte Vertretung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Substitution"
+    delete:
+      tags: [substitutions]
+      summary: Vertretung löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Vertretung gelöscht
+
+  /api/v1/events:
+    get:
+      tags: [events]
+      summary: Events auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: class_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Eventliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      tags: [events]
+      summary: Event anlegen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventRequest"
+      responses:
+        "201":
+          description: Event angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /api/v1/events/{id}:
+    patch:
+      tags: [events]
+      summary: Event aktualisieren
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEventRequest"
+      responses:
+        "200":
+          description: Aktualisiertes Event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+    delete:
+      tags: [events]
+      summary: Event löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Event gelöscht
+
+  /api/v1/classes/{id}/folders:
+    get:
+      tags: [files]
+      summary: Ordner einer Klasse auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ordnerliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FileFolder"
+    post:
+      tags: [files]
+      summary: Ordner anlegen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFolderRequest"
+      responses:
+        "201":
+          description: Ordner angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileFolder"
+
+  /api/v1/folders/{id}:
+    delete:
+      tags: [files]
+      summary: Ordner löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Ordner gelöscht
+
+  /api/v1/classes/{id}/files:
+    get:
+      tags: [files]
+      summary: Dateien einer Klasse auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: folder_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dateiliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/File"
+    post:
+      tags: [files]
+      summary: Datei hochladen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folder_id:
+                  type: integer
+      responses:
+        "201":
+          description: Datei hochgeladen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+
+  /api/v1/files/{id}:
+    get:
+      tags: [files]
+      summary: Datei herunterladen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Datei
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+    delete:
+      tags: [files]
+      summary: Datei löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Datei gelöscht
+
+  /api/v1/channels:
+    get:
+      tags: [chat]
+      summary: Meine Chat-Channels auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Channelliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatChannel"
+    post:
+      tags: [chat]
+      summary: Chat-Channel erstellen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChannelRequest"
+      responses:
+        "201":
+          description: Channel erstellt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatChannel"
+
+  /api/v1/channels/{id}/messages:
+    get:
+      tags: [chat]
+      summary: Nachrichten eines Channels abrufen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: before
+          in: query
+          schema:
+            type: integer
+          description: Nachrichten vor dieser ID (Pagination)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Nachrichtenliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      tags: [chat]
+      summary: Nachricht senden
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Nachricht gesendet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /api/v1/subjects:
+    get:
+      tags: [subjects]
+      summary: Schulfächer auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Fächerliste
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subject"
+    post:
+      tags: [subjects]
+      summary: Schulfach anlegen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubjectRequest"
+      responses:
+        "201":
+          description: Fach angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subject"
+
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Health Check
+      responses:
+        "200":
+          description: Server läuft
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string

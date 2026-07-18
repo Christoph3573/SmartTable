@@ -1,6 +1,6 @@
-# Session 03: Webserver + Ansible - Gerüst
+# Deployment-Infrastruktur
 
-Vorgefertigte **Website** (`site/`) und ein bewusst simples **Ansible-Grundgerüst** für die Code-Club-Session.
+Ansible-Playbooks und Rollen für den Smart-Table-Deploy auf dem Raspberry Pi.
 
 ## Inhalt
 
@@ -25,3 +25,7 @@ Vorgefertigte **Website** (`site/`) und ein bewusst simples **Ansible-Grundgerü
 4. Danach erweitert ihr das Playbook/optional eine Rolle gemeinsam um echte Tasks.
 
 Vollständige Session-Anleitung: [03-session-webserver-ansible.md](../docs/anleitungen/03-session-webserver-ansible.md)
+
+---
+
+*Siehe auch: [`../README.md`](../README.md) für die Übersicht über das gesamte Smart-Table-Projekt.*

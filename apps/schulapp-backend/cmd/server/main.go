@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
+	"schulapp/internal/api"
 	"schulapp/internal/api/handler"
-	appmw "schulapp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -54,8 +54,6 @@ func main() {
 		port = "8080"
 	}
 
-	authHandler := &handler.AuthHandler{DB: db, JWTSecret: jwtSecret}
-
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -75,27 +73,14 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Login-Rate-Limiter: 5 Anfragen pro Minute
-	loginLimiter := rate.NewLimiter(rate.Every(time.Minute/5), 5)
+	srv := &handler.Server{
+		DB:           db,
+		JWTSecret:    jwtSecret,
+		LoginLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5),
+	}
 
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Route("/auth", func(r chi.Router) {
-			r.With(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					if !loginLimiter.Allow() {
-						http.Error(w, `{"error":"zu viele Anfragen"}`, http.StatusTooManyRequests)
-						return
-					}
-					next.ServeHTTP(w, req)
-				})
-			}).Post("/login", authHandler.Login)
-
-			r.Post("/refresh", authHandler.Refresh)
-			r.Post("/logout", authHandler.Logout)
-
-			r.With(appmw.Auth(jwtSecret)).Get("/me", authHandler.Me)
-			r.With(appmw.Auth(jwtSecret)).Patch("/me", authHandler.UpdateMe)
-		})
+	api.HandlerWithOptions(srv, api.ChiServerOptions{
+		BaseRouter: r,
 	})
 
 	addr := fmt.Sprintf(":%s", port)
@@ -104,16 +89,6 @@ func main() {
 }
 
 func seedAdminUser(db *sql.DB) {
-	var exists bool
-	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = 'admin@schule.de')`).Scan(&exists)
-	if err != nil {
-		log.Printf("seed: Fehler beim Prüfen auf Admin-User: %v", err)
-		return
-	}
-	if exists {
-		return
-	}
-
 	hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), 12)
 	if err != nil {
 		log.Printf("seed: Fehler beim Hash-Generieren: %v", err)
@@ -121,12 +96,17 @@ func seedAdminUser(db *sql.DB) {
 	}
 
 	_, err = db.Exec(
-		`INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES ($1, $2, $3, $4, $5)`,
+		`INSERT INTO users (email, password_hash, first_name, last_name, role, active)
+		 VALUES ($1, $2, $3, $4, $5, true)
+		 ON CONFLICT (email) DO UPDATE SET
+		   password_hash = EXCLUDED.password_hash,
+		   role = 'admin',
+		   active = true`,
 		"admin@schule.de", string(hash), "Admin", "Schule", "admin",
 	)
 	if err != nil {
-		log.Printf("seed: Fehler beim Anlegen des Admin-Users: %v", err)
+		log.Printf("seed: Fehler beim Anlegen/Updaten des Admin-Users: %v", err)
 		return
 	}
-	log.Println("seed: Admin-User angelegt (admin@schule.de / admin123)")
+	log.Println("seed: Admin-User sichergestellt (admin@schule.de / admin123)")
 }
