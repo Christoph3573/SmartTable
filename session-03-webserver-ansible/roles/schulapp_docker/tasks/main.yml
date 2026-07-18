@@ -36,43 +36,6 @@
     state: started
     enabled: true
 
-- name: pip installieren (für Docker Python SDK)
-  ansible.builtin.apt:
-    name: python3-pip
-    state: present
-
-- name: Docker Python SDK installieren
-  ansible.builtin.pip:
-    name: docker
-    state: present
-    break_system_packages: true
-
-- name: Caddy stoppen und deaktivieren (wird durch Nginx in Docker ersetzt)
-  ansible.builtin.systemd:
-    name: caddy
-    state: stopped
-    enabled: false
-  failed_when: false
-
-- name: Altes schulapp-backend stoppen und deaktivieren (wird durch Docker ersetzt)
-  ansible.builtin.systemd:
-    name: schulapp
-    state: stopped
-    enabled: false
-  failed_when: false
-
-- name: Alte Docker-Container entfernen (schulapp-postgres)
-  community.docker.docker_container:
-    name: "{{ postgres_container_name | default('schulapp-postgres') }}"
-    state: absent
-  failed_when: false
-
-- name: Altes Docker-Netzwerk und Volume entfernen (werden von compose verwaltet)
-  community.docker.docker_network:
-    name: "{{ postgres_network_name | default('schulapp_net') }}"
-    state: absent
-  failed_when: false
-
 - name: IDs von Containern ermitteln, die unsere Zielports blockieren (z.B. Reste von manuellem Testen)
   ansible.builtin.shell: >
     (docker ps -q --filter "publish={{ postgres_host_port }}";
@@ -125,24 +88,8 @@
       - "--exclude=dist"
     delete: true
 
-- name: Belegte TCP-Ports mit Prozess anzeigen (Debug, vor Compose-Start)
-  ansible.builtin.shell: "ss -H -tlnp 2>&1 || true"
-  register: all_ports_proc
-  changed_when: false
-
-- name: Ports ausgeben
-  ansible.builtin.debug:
-    var: all_ports_proc.stdout_lines
-
-- name: Laufende Docker-Container anzeigen (Debug, vor Compose-Start)
-  ansible.builtin.command: docker ps -a
-  register: docker_ps_pre
-  changed_when: false
-  failed_when: false
-
-- name: Docker-Container ausgeben
-  ansible.builtin.debug:
-    var: docker_ps_pre.stdout_lines
+- name: Alte exited Container aufräumen (migrate-Container etc.)
+  ansible.builtin.command: docker container prune -f
 
 - name: Docker-Compose ausführen (bauen + starten)
   community.docker.docker_compose_v2:
