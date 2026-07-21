@@ -288,6 +288,6 @@ Der Docker-Build läuft **auf dem Pi**. `make generate` wird dort **nicht** aufg
 | Tool | Zweck | Installation |
 |---|---|---|
 | Go 1.24+ | Compiler | `apt install golang-1.24-go` |
-| oapi-codegen | Go-Code aus OpenAPI | `go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest` |
+| oapi-codegen | Go-Code aus OpenAPI | `go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --config=oapi-codegen.yaml openapi.yaml` |
 | sqlc | Go-Code aus SQL | `go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest` |
 | golang-migrate | DB-Migrationen | `go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest` |

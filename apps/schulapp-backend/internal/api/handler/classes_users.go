@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -281,28 +284,115 @@ func (h *Server) PostApiV1Users(w http.ResponseWriter, r *http.Request) {
 	if !requireRole(w, h.claims(w, r), "admin") {
 		return
 	}
-	var req api.LoginRequest
-	if json.NewDecoder(r.Body).Decode(&req) != nil || strings.TrimSpace(string(req.Email)) == "" || len(req.Password) < 8 {
-		writeError(w, 400, "E-Mail und Passwort (mindestens 8 Zeichen) sind erforderlich")
+	var req api.CreateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, 400, "ungültiges JSON")
 		return
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		writeError(w, 500, "Passwort konnte nicht verarbeitet werden")
+	if err := validateCreateUser(req); err != nil {
+		writeError(w, 400, err.Error())
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(string(req.Email)))
-	name := strings.Split(email, "@")[0]
-	u, err := scanUser(h.DB.QueryRowContext(r.Context(), `INSERT INTO users(email,password_hash,first_name,last_name,role) VALUES($1,$2,$3,$4,'student') RETURNING id,email,first_name,last_name,role`, email, string(hash), name, ""))
+	tx, err := h.DB.BeginTx(r.Context(), nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "unique") {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	defer tx.Rollback()
+	u, err := createUser(r.Context(), tx, req)
+	if err != nil {
+		if isDuplicate(err) {
 			writeError(w, 409, "E-Mail bereits vergeben")
 			return
 		}
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}
+	if err = tx.Commit(); err != nil {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
 	writeJSON(w, 201, u)
+}
+
+func (h *Server) PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request) {
+	if !requireRole(w, h.claims(w, r), "admin") {
+		return
+	}
+	var req api.BulkCreateUsersRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, 400, "ungültiges JSON")
+		return
+	}
+	if len(req.Users) == 0 || len(req.Users) > 200 {
+		writeError(w, 400, "zwischen 1 und 200 Benutzern angeben")
+		return
+	}
+	for _, user := range req.Users {
+		if err := validateCreateUser(user); err != nil {
+			writeError(w, 400, err.Error())
+			return
+		}
+	}
+	tx, err := h.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	defer tx.Rollback()
+	users := make([]api.User, 0, len(req.Users))
+	for _, user := range req.Users {
+		created, err := createUser(r.Context(), tx, user)
+		if err != nil {
+			if isDuplicate(err) {
+				writeError(w, 409, "mindestens eine E-Mail ist bereits vergeben")
+				return
+			}
+			writeError(w, 500, "Datenbankfehler")
+			return
+		}
+		users = append(users, created)
+	}
+	if err = tx.Commit(); err != nil {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	writeJSON(w, 201, api.BulkCreateUsersResponse{Users: users})
+}
+
+func validateCreateUser(req api.CreateUserRequest) error {
+	email := strings.ToLower(strings.TrimSpace(string(req.Email)))
+	parsed, err := mail.ParseAddress(email)
+	if err != nil || parsed.Address != email {
+		return errors.New("gültige E-Mail ist erforderlich")
+	}
+	if len(req.Password) < 8 {
+		return errors.New("Passwort muss mindestens 8 Zeichen lang sein")
+	}
+	if strings.TrimSpace(req.FirstName) == "" || strings.TrimSpace(req.LastName) == "" {
+		return errors.New("Vor- und Nachname sind erforderlich")
+	}
+	if !validRole(string(req.Role)) {
+		return errors.New("ungültige Rolle")
+	}
+	return nil
+}
+
+func validRole(role string) bool {
+	return role == "student" || role == "teacher" || role == "admin"
+}
+
+func createUser(ctx context.Context, tx *sql.Tx, req api.CreateUserRequest) (api.User, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return api.User{}, err
+	}
+	email := strings.ToLower(strings.TrimSpace(string(req.Email)))
+	return scanUser(tx.QueryRowContext(ctx, `INSERT INTO users(email,password_hash,first_name,last_name,role) VALUES($1,$2,$3,$4,$5) RETURNING id,email,first_name,last_name,role`, email, string(hash), strings.TrimSpace(req.FirstName), strings.TrimSpace(req.LastName), string(req.Role)))
+}
+
+func isDuplicate(err error) bool {
+	return strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique")
 }
 func (h *Server) GetApiV1UsersId(w http.ResponseWriter, r *http.Request, id int) {
 	c := h.claims(w, r)
@@ -337,7 +427,29 @@ func (h *Server) PatchApiV1UsersId(w http.ResponseWriter, r *http.Request, id in
 		writeError(w, 400, "ungültiges JSON")
 		return
 	}
-	u, err := scanUser(h.DB.QueryRowContext(r.Context(), `UPDATE users SET first_name=COALESCE($1,first_name),last_name=COALESCE($2,last_name),updated_at=NOW() WHERE id=$3 AND active RETURNING id,email,first_name,last_name,role`, req.FirstName, req.LastName, id))
+	if c.Role != "admin" && (req.Role != nil || req.Password != nil) {
+		writeError(w, 403, "Rolle und Passwort dürfen nur von Admins geändert werden")
+		return
+	}
+	if req.Role != nil && !validRole(string(*req.Role)) {
+		writeError(w, 400, "ungültige Rolle")
+		return
+	}
+	var passwordHash *string
+	if req.Password != nil {
+		if len(*req.Password) < 8 {
+			writeError(w, 400, "Passwort muss mindestens 8 Zeichen lang sein")
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			writeError(w, 500, "Passwort konnte nicht verarbeitet werden")
+			return
+		}
+		value := string(hash)
+		passwordHash = &value
+	}
+	u, err := scanUser(h.DB.QueryRowContext(r.Context(), `UPDATE users SET first_name=COALESCE($1,first_name),last_name=COALESCE($2,last_name),role=COALESCE($3,role),password_hash=COALESCE($4,password_hash),updated_at=NOW() WHERE id=$5 AND active RETURNING id,email,first_name,last_name,role`, req.FirstName, req.LastName, req.Role, passwordHash, id))
 	if notFound(w, err, "Benutzer") {
 		return
 	}

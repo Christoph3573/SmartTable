@@ -18,7 +18,7 @@ angebunden; die Oberfläche enthält keine lokalen Demo-Datensätze.
 | Hausaufgaben | Offene Aufgaben und Abgaben | Aufgaben und Abgaben der eigenen Klassen | Alle Aufgaben einsehen |
 | Dateien | Dateien der eigenen Klassen lesen | Hochladen und verwalten | Vollzugriff |
 | Chat | Eigene Kanäle und Nachrichten | Eigene Kanäle und Nachrichten | Eigene Kanäle und Moderation |
-| Benutzer | – | – | Benutzerkonten anlegen, ändern und deaktivieren |
+| Benutzer | – | – | Einzelne oder bis zu 200 Konten auf einmal anlegen, ändern und deaktivieren |
 
 Backend-seitig werden Zugriffe nicht nur über die Rolle, sondern zusätzlich
 über Klassen- oder Kanalmitgliedschaften geprüft. Ein gültiger Token allein
@@ -60,7 +60,10 @@ Endpunkten gilt deshalb immer diese Reihenfolge:
 Die API gliedert sich in:
 
 - `auth`: Login, Token-Erneuerung, Logout und Profil.
-- `users`, `classes`, `subjects`: Stammdaten und Klassenmitgliedschaften.
+- `users`, `classes`, `subjects`: Stammdaten und Klassenmitgliedschaften. Die
+  Administration kann Klassenname und Schuljahr direkt pflegen, Schüler und
+  Lehrkräfte zuordnen bzw. entfernen und beim Massenimport neu angelegte
+  Konten unmittelbar einer Klasse zuweisen.
 - `substitutions`, `events`: Tages- und Terminplanung.
 - `homework`, `submissions`: Aufgaben und Abgabestatus.
 - `files`, `folders`: Klassenmaterial mit persistentem Upload-Speicher.

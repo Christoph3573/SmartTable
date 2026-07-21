@@ -249,7 +249,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["LoginRequest"];
+                    "application/json": components["schemas"]["CreateUserRequest"];
                 };
             };
             responses: {
@@ -260,6 +260,46 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["User"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mehrere Benutzer anlegen */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BulkCreateUsersRequest"];
+                };
+            };
+            responses: {
+                /** @description Benutzer angelegt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BulkCreateUsersResponse"];
                     };
                 };
             };
@@ -1659,6 +1699,24 @@ export interface components {
         UpdateUserRequest: {
             first_name?: string;
             last_name?: string;
+            /** @enum {string} */
+            role?: "student" | "teacher" | "admin";
+            password?: string;
+        };
+        CreateUserRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+            first_name: string;
+            last_name: string;
+            /** @enum {string} */
+            role: "student" | "teacher" | "admin";
+        };
+        BulkCreateUsersRequest: {
+            users: components["schemas"]["CreateUserRequest"][];
+        };
+        BulkCreateUsersResponse: {
+            users: components["schemas"]["User"][];
         };
         Class: {
             id: number;

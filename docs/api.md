@@ -15,18 +15,30 @@ PATCH /me         Eigenes Profil aktualisieren
 ```
 GET    /          Alle Benutzer
 POST   /          Benutzer erstellen
+POST   /bulk       Bis zu 200 Benutzer atomar erstellen
 PATCH  /:id       Benutzer bearbeiten
 DELETE /:id       Benutzer deaktivieren
 ```
+
+`POST /bulk` erwartet ein Array von Benutzerobjekten mit E-Mail, Vorname,
+Nachname, Rolle und Startpasswort. Scheitert ein Datensatz (beispielsweise an
+einer bereits verwendeten E-Mail-Adresse), wird kein Benutzer aus diesem
+Aufruf angelegt. Das UI kann die erfolgreich angelegten Schüler und Lehrkräfte
+im selben Arbeitsschritt einer ausgewählten Klasse zuordnen.
 
 ## Klassen `/api/v1/classes`
 
 ```
 GET    /                      Klassen (eigene für Schüler/Lehrer)
 POST   /                      Klasse erstellen (Admin)
+PATCH  /:id                   Klassenname und Schuljahr ändern (Admin)
+DELETE /:id                   Klasse löschen (Admin)
+GET    /:id/members            Schüler der Klasse auflisten
 POST   /:id/members           Schüler hinzufügen
 DELETE /:id/members/:uid      Schüler entfernen
+GET    /:id/teachers           Lehrkräfte der Klasse auflisten
 POST   /:id/teachers          Lehrer zuweisen
+DELETE /:id/teachers/:uid     Lehrkraft entfernen
 ```
 
 ## Vertretungsplan `/api/v1/substitutions`

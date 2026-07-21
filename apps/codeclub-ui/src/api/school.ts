@@ -3,6 +3,10 @@ import type { components } from "./generated/types";
 
 export type SchoolClass = components["schemas"]["Class"];
 export type SchoolUser = components["schemas"]["User"];
+export type CreateUserInput = components["schemas"]["CreateUserRequest"];
+export type UpdateUserInput = components["schemas"]["UpdateUserRequest"];
+export type ClassMember = components["schemas"]["ClassMember"];
+export type ClassTeacher = components["schemas"]["ClassTeacher"];
 export type Subject = components["schemas"]["Subject"];
 export type Substitution = components["schemas"]["Substitution"];
 export type CalendarEvent = components["schemas"]["Event"];
@@ -19,14 +23,32 @@ export type SubstitutionInput = components["schemas"]["CreateSubstitutionRequest
 
 export const schoolApi = {
   users: () => apiClient.get<SchoolUser[]>("/api/v1/users").then((r) => r.data),
-  createUser: (data: { email: string; password: string }) =>
+  createUser: (data: CreateUserInput) =>
     apiClient.post<SchoolUser>("/api/v1/users", data).then((r) => r.data),
+  createUsersBulk: (users: CreateUserInput[]) =>
+    apiClient.post<{ users: SchoolUser[] }>("/api/v1/users/bulk", { users }).then((r) => r.data.users),
+  updateUser: (id: number, data: UpdateUserInput) =>
+    apiClient.patch<SchoolUser>(`/api/v1/users/${id}`, data).then((r) => r.data),
   deleteUser: (id: number) => apiClient.delete(`/api/v1/users/${id}`),
 
   classes: () => apiClient.get<SchoolClass[]>("/api/v1/classes").then((r) => r.data),
   createClass: (data: Pick<SchoolClass, "name" | "school_year">) =>
     apiClient.post<SchoolClass>("/api/v1/classes", data).then((r) => r.data),
+  updateClass: (id: number, data: Partial<Pick<SchoolClass, "name" | "school_year">>) =>
+    apiClient.patch<SchoolClass>(`/api/v1/classes/${id}`, data).then((r) => r.data),
   deleteClass: (id: number) => apiClient.delete(`/api/v1/classes/${id}`),
+  classMembers: (id: number) =>
+    apiClient.get<ClassMember[]>(`/api/v1/classes/${id}/members`).then((r) => r.data),
+  addClassMember: (classId: number, userId: number) =>
+    apiClient.post(`/api/v1/classes/${classId}/members`, { user_id: userId }),
+  removeClassMember: (classId: number, userId: number) =>
+    apiClient.delete(`/api/v1/classes/${classId}/members/${userId}`),
+  classTeachers: (id: number) =>
+    apiClient.get<ClassTeacher[]>(`/api/v1/classes/${id}/teachers`).then((r) => r.data),
+  addClassTeacher: (classId: number, userId: number, isHomeTeacher = false) =>
+    apiClient.post(`/api/v1/classes/${classId}/teachers`, { user_id: userId, is_home_teacher: isHomeTeacher }),
+  removeClassTeacher: (classId: number, userId: number) =>
+    apiClient.delete(`/api/v1/classes/${classId}/teachers/${userId}`),
 
   subjects: () => apiClient.get<Subject[]>("/api/v1/subjects").then((r) => r.data),
   substitutions: (params?: { date_from?: string; date_to?: string; class_id?: number }) =>

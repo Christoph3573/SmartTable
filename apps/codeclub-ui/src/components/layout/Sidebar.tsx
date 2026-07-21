@@ -76,10 +76,10 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-[#e5e6df] bg-[#fbfbf8]">
-      <div className="flex h-20 items-center gap-3 border-b border-[#e5e6df] px-6">
-        <span className="grid size-8 place-items-center rounded-lg bg-[#336e72] font-serif text-lg text-white">S</span>
-        <span className="font-bold tracking-tight text-[#24283a]">SchulApp</span>
+    <aside className="sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="flex h-20 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
+        <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-lg font-bold text-white">S</span>
+        <span className="font-bold tracking-tight text-gray-900 dark:text-white">SchulApp</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4">
@@ -91,8 +91,8 @@ export function Sidebar() {
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                   ${isActive
-                    ? "bg-[#e7f1ed] text-[#245c5f]"
-                    : "text-[#6e746d] hover:bg-[#f0f1ec] hover:text-[#24283a]"
+                    ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                   }`
                 }
               >
@@ -104,22 +104,22 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-[#e5e6df] p-4">
+      <div className="border-t border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-          <div className="flex size-8 items-center justify-center rounded-full bg-[#e8dfc9] text-sm font-medium text-[#6c551e]">
+          <div className="flex size-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-medium text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
             {user?.first_name?.[0]}{user?.last_name?.[0]}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium text-[#24283a]">
+            <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
               {user?.first_name} {user?.last_name}
             </p>
-            <p className="truncate text-xs text-[#72776d]">
+            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
               {user?.role === "student" ? "Schüler" : user?.role === "teacher" ? "Lehrer" : "Admin"}
             </p>
           </div>
           <button
             onClick={handleLogout}
-            className="rounded p-1 text-[#8a8f86] transition-colors hover:bg-[#eef0ea] hover:text-[#3b4238]"
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
             title="Abmelden"
           >
             <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
