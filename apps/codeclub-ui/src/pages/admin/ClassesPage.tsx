@@ -1,8 +1,8 @@
-export function ClassesPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Klassenverwaltung</h1>
-      <p className="mt-2 text-gray-500">Wird in Phase 2 implementiert.</p>
-    </div>
-  );
-}
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { schoolApi } from "../../api/school";
+import { Button } from "../../components/ui/Button";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
+
+export function ClassesPage() { const [open,setOpen]=useState(false); const client=useQueryClient(); const classes=useQuery({queryKey:["classes"],queryFn:schoolApi.classes});const create=useMutation({mutationFn:schoolApi.createClass,onSuccess:()=>{client.invalidateQueries({queryKey:["classes"]});setOpen(false)}});const remove=useMutation({mutationFn:schoolApi.deleteClass,onSuccess:()=>client.invalidateQueries({queryKey:["classes"]})});return <div className="page"><PageHeader eyebrow="Verwaltung" title="Klassen"><Button onClick={()=>setOpen(true)}>Klasse anlegen</Button></PageHeader>{classes.isLoading?<LoadingState/>:classes.isError?<ErrorState onRetry={()=>classes.refetch()}/>:<section className="surface overflow-hidden">{classes.data?.length?classes.data.map((schoolClass)=><div className="data-row" key={schoolClass.id}><span className="grid size-10 place-items-center rounded-xl bg-[#e7f1ed] font-bold text-[#286567]">{schoolClass.name.slice(0,2)}</span><div className="data-row-main"><strong>Klasse {schoolClass.name}</strong><p>Schuljahr {schoolClass.school_year}</p></div><button className="text-button text-red-600" onClick={()=>remove.mutate(schoolClass.id)}>Löschen</button></div>):<EmptyState title="Noch keine Klassen" description="Lege eine Klasse an, um Unterricht und Materialien zu organisieren."/>}</section>}{open&&<ClassForm pending={create.isPending} error={create.isError} onClose={()=>setOpen(false)} onSubmit={(name,school_year)=>create.mutate({name,school_year})}/>}</div> }
+function ClassForm({onClose,onSubmit,pending,error}:{onClose:()=>void;onSubmit:(name:string,year:string)=>void;pending:boolean;error:boolean}) {const [name,setName]=useState("");const [year,setYear]=useState("2026/27");return <div className="modal-backdrop" role="dialog" aria-modal="true"><form className="modal" onSubmit={(event)=>{event.preventDefault();onSubmit(name,year)}}><h2>Klasse anlegen</h2><div className="form-grid"><label>Bezeichnung<input className="mt-1 w-full rounded-lg border p-2" required placeholder="7a" value={name} onChange={(event)=>setName(event.target.value)}/></label><label>Schuljahr<input className="mt-1 w-full rounded-lg border p-2" required value={year} onChange={(event)=>setYear(event.target.value)}/></label></div>{error&&<p className="mt-3 text-sm text-red-600">Die Klasse konnte nicht angelegt werden.</p>}<div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>Abbrechen</Button><Button loading={pending}>Anlegen</Button></div></form></div>}

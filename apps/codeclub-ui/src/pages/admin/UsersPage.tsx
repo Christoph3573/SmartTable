@@ -1,8 +1,13 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { schoolApi } from "../../api/school";
+import { Button } from "../../components/ui/Button";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
+
 export function UsersPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Benutzerverwaltung</h1>
-      <p className="mt-2 text-gray-500">Wird in Phase 2 implementiert.</p>
-    </div>
-  );
+  const [open, setOpen] = useState(false); const [filter, setFilter] = useState(""); const client = useQueryClient();
+  const users = useQuery({ queryKey: ["users"], queryFn: schoolApi.users }); const create = useMutation({ mutationFn: schoolApi.createUser, onSuccess: () => { client.invalidateQueries({ queryKey: ["users"] }); setOpen(false); } }); const remove = useMutation({ mutationFn: schoolApi.deleteUser, onSuccess: () => client.invalidateQueries({ queryKey: ["users"] }) });
+  const filtered = users.data?.filter((user) => `${user.first_name} ${user.last_name} ${user.email}`.toLowerCase().includes(filter.toLowerCase()));
+  return <div className="page"><PageHeader eyebrow="Verwaltung" title="Benutzer"><input className="rounded-lg border border-[#dfe1da] bg-white px-3 py-2 text-sm" placeholder="Benutzer suchen" value={filter} onChange={(event) => setFilter(event.target.value)} /><Button onClick={() => setOpen(true)}>Benutzer anlegen</Button></PageHeader>{users.isLoading ? <LoadingState /> : users.isError ? <ErrorState onRetry={() => users.refetch()} /> : <section className="surface overflow-hidden"><div className="grid grid-cols-[1fr_auto] border-b border-[#eeeee8] px-5 py-3 text-xs font-bold uppercase tracking-wider text-[#858b81]"><span>Name</span><span>Rolle</span></div>{filtered?.length ? filtered.map((user) => <div className="data-row" key={user.id}><span className="grid size-9 place-items-center rounded-full bg-[#e8dfc9] text-xs font-bold text-[#6c551e]">{user.first_name[0]}{user.last_name[0]}</span><div className="data-row-main"><strong>{user.first_name} {user.last_name}</strong><p>{user.email}</p></div><span className={`pill ${user.role === "admin" ? "red" : user.role === "teacher" ? "blue" : ""}`}>{user.role === "teacher" ? "Lehrkraft" : user.role === "student" ? "Schüler:in" : "Admin"}</span><button className="text-button text-red-600" onClick={() => remove.mutate(user.id)}>Löschen</button></div>) : <EmptyState title="Keine Treffer" description="Passe die Suche an oder lege einen Benutzer an." />}</section>}{open && <UserForm pending={create.isPending} error={create.isError} onClose={() => setOpen(false)} onSubmit={(email, password) => create.mutate({email,password})}/>}</div>;
 }
+function UserForm({onClose,onSubmit,pending,error}:{onClose:()=>void;onSubmit:(email:string,password:string)=>void;pending:boolean;error:boolean}) { const [email,setEmail]=useState("");const [password,setPassword]=useState("");return <div className="modal-backdrop" role="dialog" aria-modal="true"><form className="modal" onSubmit={(event)=>{event.preventDefault();onSubmit(email,password)}}><h2>Benutzer anlegen</h2><div className="form-grid"><label className="full">E-Mail<input className="mt-1 w-full rounded-lg border p-2" type="email" required value={email} onChange={(event)=>setEmail(event.target.value)}/></label><label className="full">Startpasswort<input className="mt-1 w-full rounded-lg border p-2" type="password" minLength={8} required value={password} onChange={(event)=>setPassword(event.target.value)}/></label></div>{error&&<p className="mt-3 text-sm text-red-600">Der Benutzer konnte nicht angelegt werden.</p>}<div className="modal-actions"><Button variant="ghost" type="button" onClick={onClose}>Abbrechen</Button><Button loading={pending}>Anlegen</Button></div></form></div> }

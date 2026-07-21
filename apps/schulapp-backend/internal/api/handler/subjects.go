@@ -47,6 +47,10 @@ func (h *Server) PostApiV1Subjects(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "nicht autorisiert")
 		return
 	}
+	if claims.Role != "admin" {
+		writeError(w, http.StatusForbidden, "keine Berechtigung")
+		return
+	}
 
 	var req api.CreateSubjectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

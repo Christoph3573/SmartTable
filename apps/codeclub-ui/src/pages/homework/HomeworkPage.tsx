@@ -1,8 +1,26 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { schoolApi, type HomeworkInput } from "../../api/school";
+import { useAuthStore } from "../../store/authStore";
+import { Button } from "../../components/ui/Button";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
+import { formatDate } from "../../lib/format";
+
 export function HomeworkPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Hausaufgaben</h1>
-      <p className="mt-2 text-gray-500">Wird in Phase 6 implementiert.</p>
-    </div>
-  );
+  const [classId, setClassId] = useState<number>(); const [createOpen, setCreateOpen] = useState(false); const client = useQueryClient(); const user = useAuthStore((state) => state.user);
+  const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes }); const subjects = useQuery({ queryKey: ["subjects"], queryFn: schoolApi.subjects });
+  const activeClassId = classId ?? classes.data?.[0]?.id;
+  const homework = useQuery({ queryKey: ["homework", activeClassId], queryFn: () => schoolApi.homework(activeClassId!), enabled: Boolean(activeClassId) });
+  const create = useMutation({ mutationFn: (data: HomeworkInput) => schoolApi.createHomework(activeClassId!, data), onSuccess: () => { client.invalidateQueries({ queryKey: ["homework", activeClassId] }); setCreateOpen(false); } });
+  const submit = useMutation({ mutationFn: schoolApi.submitHomework, onSuccess: () => client.invalidateQueries({ queryKey: ["homework", activeClassId] }) }); const remove = useMutation({ mutationFn: schoolApi.deleteHomework, onSuccess: () => client.invalidateQueries({ queryKey: ["homework", activeClassId] }) });
+  const isTeacher = user?.role === "teacher" || user?.role === "admin"; const subject = (id: number) => subjects.data?.find((entry) => entry.id === id)?.short ?? "Fach";
+  return <div className="page"><PageHeader eyebrow="Lernplan" title="Hausaufgaben"><select aria-label="Klasse wählen" className="rounded-lg border border-[#dfe1da] bg-white px-3 py-2 text-sm" value={activeClassId ?? ""} onChange={(event) => setClassId(Number(event.target.value))}>{classes.data?.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>{isTeacher && <Button onClick={() => setCreateOpen(true)}>Aufgabe anlegen</Button>}</PageHeader>
+    {classes.isLoading || (activeClassId && homework.isLoading) ? <LoadingState /> : classes.isError || homework.isError ? <ErrorState onRetry={() => { classes.refetch(); homework.refetch(); }} /> : !activeClassId ? <EmptyState title="Keine Klasse verfügbar" description="Sobald du einer Klasse zugeordnet bist, findest du hier ihre Aufgaben." /> : <section className="surface overflow-hidden">{homework.data?.length ? homework.data.sort((a,b) => a.due_date.localeCompare(b.due_date)).map((item) => { const late = new Date(`${item.due_date}T23:59:59`) < new Date(); return <div className="data-row" key={item.id}><time className={`grid size-11 place-items-center rounded-xl text-center font-mono text-xs ${late ? "bg-[#fbeaea] text-[#a23d3d]" : "bg-[#e8f0ed] text-[#2c696a]"}`}>{formatDate(item.due_date, {day:"2-digit",month:"short"})}</time><div className="data-row-main"><strong>{item.title} <span className="pill blue ml-2">{subject(item.subject_id)}</span></strong><p>{item.description || "Keine weitere Beschreibung."}</p></div>{isTeacher ? <button className="text-button text-red-600" onClick={() => remove.mutate(item.id)}>Löschen</button> : <Button size="sm" loading={submit.isPending} onClick={() => submit.mutate(item.id)}>Abgeben</Button>}</div>; }) : <EmptyState title="Alles erledigt" description={isTeacher ? "Lege die erste Aufgabe für diese Klasse an." : "Für diese Klasse stehen aktuell keine Aufgaben an."} />}</section>}
+    {createOpen && <HomeworkForm subjects={subjects.data ?? []} pending={create.isPending} error={create.isError} onClose={() => setCreateOpen(false)} onSubmit={(data) => create.mutate(data)} />}
+  </div>;
+}
+
+function HomeworkForm({ subjects, onClose, onSubmit, pending, error }: { subjects: {id:number; name:string; short:string}[]; onClose: () => void; onSubmit: (data: HomeworkInput) => void; pending: boolean; error: boolean }) {
+  const [form, setForm] = useState({ title: "", description: "", due_date: new Date().toISOString().slice(0, 10), subject_id: "" });
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><form className="modal" onSubmit={(event) => { event.preventDefault(); onSubmit({ title: form.title, description: form.description || undefined, due_date: form.due_date, subject_id: Number(form.subject_id) }); }}><h2>Hausaufgabe anlegen</h2><div className="form-grid"><label className="full">Titel<input className="mt-1 w-full rounded-lg border p-2" required value={form.title} onChange={(event) => setForm({...form,title:event.target.value})}/></label><label>Fach<select className="mt-1 w-full rounded-lg border p-2" required value={form.subject_id} onChange={(event) => setForm({...form,subject_id:event.target.value})}><option value="">Auswählen</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label>Fällig am<input className="mt-1 w-full rounded-lg border p-2" required type="date" value={form.due_date} onChange={(event) => setForm({...form,due_date:event.target.value})}/></label><label className="full">Beschreibung<textarea className="mt-1 w-full rounded-lg border p-2" rows={3} value={form.description} onChange={(event) => setForm({...form,description:event.target.value})}/></label></div>{error && <p className="mt-3 text-sm text-red-600">Die Aufgabe konnte nicht gespeichert werden.</p>}<div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>Abbrechen</Button><Button loading={pending}>Speichern</Button></div></form></div>;
 }

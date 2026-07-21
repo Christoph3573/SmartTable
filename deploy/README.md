@@ -1,31 +1,42 @@
 # Deployment-Infrastruktur
 
-Ansible-Playbooks und Rollen für den Smart-Table-Deploy auf dem Raspberry Pi.
+Ansible-Playbooks und Rollen für den SmartTable-Deploy auf den Raspberry Pis.
 
 ## Inhalt
 
 | Pfad | Zweck |
 |------|--------|
-| `site/` | Statische Website (Template für Teilnehmende) |
-| `inventory/hosts` | Host-Gruppe `webservers` (INI wie in `.ansible`) |
-| `inventory/group_vars/all.yml` | Leere Vorlage für gemeinsame Variablen |
-| `inventory/host_vars/<host>/vars.yml` | Leere Vorlage für host-spezifische Variablen |
-| `inventory/host_vars/<host>/vault.yml` | Optionale Secrets-Datei (ansible-vault) |
-| `roles/example_role/` | Nur Strukturbeispiel, keine fertige Rolle |
-| `deploy.yml` | Minimales Playbook mit TODO-Task |
-| `provision.yml` | Optionales zweites Playbook-Gerüst |
-| `ansible.cfg` | Standard-Inventory und Optionen |
+| `inventory/hosts` | Zielhosts in der Gruppe `webservers` |
+| `inventory/group_vars/all.yml` | Gemeinsame Variablen für App, Docker und Caddy |
+| `inventory/host_vars/<host>/vars.yml` | Host-spezifische Ports, Pfade und Secrets |
+| `deploy.yml` | Startet den vollständigen Compose-Stack und den SSH-Tunnel |
+| `provision.yml` | Richtet die Betriebssystem-Basis des Hosts ein |
+| `roles/schulapp_docker/` | Synchronisiert die Quellen und führt Docker Compose aus |
+| `roles/ssh_tunnel/` | Stellt den Reverse-Tunnel zur Code-Club-VM her |
 
 ## Schnellstart
 
-1. `inventory/hosts`: Hosteintrag (`ansible_host`, `ansible_user`) an deinen Pi anpassen.
-2. Optional `inventory/host_vars/pi-example/vars.yml` für host-spezifische Werte nutzen.
-3. Auf dem Laptop: `pip install ansible`, dann im **diesem** Verzeichnis:
+1. Zielhost und Variablen im Inventory prüfen.
+2. Auf dem Laptop die benötigten Collections installieren:
 
-4. Danach erweitert ihr das Playbook/optional eine Rolle gemeinsam um echte Tasks.
+   ```bash
+   pip install ansible
+   ansible-galaxy collection install ansible.posix community.docker community.general
+   ```
 
-Vollständige Session-Anleitung: [03-session-webserver-ansible.md](../docs/anleitungen/03-session-webserver-ansible.md)
+3. Einmalig die Hostbasis einrichten:
+
+   ```bash
+   ansible-playbook provision.yml -i inventory
+   ```
+
+4. Den Anwendungsstack ausrollen:
+
+   ```bash
+   ansible-playbook deploy.yml -i inventory
+   ```
 
 ---
 
-*Siehe auch: [`../README.md`](../README.md) für die Übersicht über das gesamte Smart-Table-Projekt.*
+Siehe auch: [`../README.md`](../README.md) und
+[`../docs/implementation.md`](../docs/implementation.md).

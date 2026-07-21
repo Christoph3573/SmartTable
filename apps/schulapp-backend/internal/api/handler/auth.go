@@ -1,15 +1,19 @@
 package handler
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"schulapp/internal/api"
 	appmw "schulapp/internal/middleware"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/time/rate"
 )
@@ -20,6 +24,7 @@ type Server struct {
 	DB           *sql.DB
 	JWTSecret    []byte
 	LoginLimiter *rate.Limiter
+	UploadDir    string
 }
 
 func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +77,7 @@ func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 	_, err = h.DB.ExecContext(r.Context(),
 		`INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
-		user.Id, refreshToken, expiresAt,
+		user.Id, refreshTokenHash(refreshToken), expiresAt,
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
@@ -105,7 +110,7 @@ func (h *Server) PostApiV1AuthRefresh(w http.ResponseWriter, r *http.Request) {
 	var expiresAt time.Time
 	err = h.DB.QueryRowContext(r.Context(),
 		`SELECT user_id, expires_at FROM refresh_tokens WHERE token = $1`,
-		cookie.Value,
+		refreshTokenHash(cookie.Value),
 	).Scan(&userID, &expiresAt)
 
 	if err == sql.ErrNoRows || time.Now().After(expiresAt) {
@@ -127,6 +132,33 @@ func (h *Server) PostApiV1AuthRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Rotate refresh tokens so a stolen cookie can only be used once.
+	newRefreshToken, err := generateRefreshToken(userID, h.JWTSecret)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "interner Fehler")
+		return
+	}
+	newExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+	tx, err := h.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "interner Fehler")
+		return
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(r.Context(), `DELETE FROM refresh_tokens WHERE token = $1`, refreshTokenHash(cookie.Value)); err != nil {
+		writeError(w, http.StatusInternalServerError, "interner Fehler")
+		return
+	}
+	if _, err = tx.ExecContext(r.Context(), `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1,$2,$3)`, userID, refreshTokenHash(newRefreshToken), newExpiresAt); err != nil {
+		writeError(w, http.StatusInternalServerError, "interner Fehler")
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, "interner Fehler")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "refresh_token", Value: newRefreshToken, Path: "/api/v1/auth", HttpOnly: true, SameSite: http.SameSiteStrictMode, Expires: newExpiresAt})
+
 	accessToken, err := h.generateAccessToken(userID, email, role)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
@@ -140,7 +172,7 @@ func (h *Server) PostApiV1AuthLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err == nil {
 		h.DB.ExecContext(r.Context(),
-			`DELETE FROM refresh_tokens WHERE token = $1`, cookie.Value)
+			`DELETE FROM refresh_tokens WHERE token = $1`, refreshTokenHash(cookie.Value))
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -219,9 +251,15 @@ func (h *Server) generateAccessToken(userID int, email, role string) (string, er
 
 func generateRefreshToken(userID int, jwtSecret []byte) (string, error) {
 	claims := jwt.RegisteredClaims{
-		Subject:   string(rune(userID)),
+		Subject:   strconv.Itoa(userID),
+		ID:        uuid.NewString(),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtSecret)
+}
+
+func refreshTokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return fmt.Sprintf("%x", sum[:])
 }

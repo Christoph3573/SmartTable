@@ -1,8 +1,21 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { schoolApi } from "../../api/school";
+import { useAuthStore } from "../../store/authStore";
+import { Button } from "../../components/ui/Button";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
+import { formatDate } from "../../lib/format";
+
+const channelLabel = (channel: { name?: string; type: string }) => channel.name || ({ direct: "Direkter Chat", class: "Klassenchat", group: "Gruppe" }[channel.type] ?? "Chat");
+
 export function ChatPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Chat</h1>
-      <p className="mt-2 text-gray-500">Wird in Phase 7 implementiert.</p>
-    </div>
-  );
+  const [channelId, setChannelId] = useState<number>(); const [text, setText] = useState(""); const client = useQueryClient(); const user = useAuthStore((state) => state.user);
+  const channels = useQuery({ queryKey: ["channels"], queryFn: schoolApi.channels });
+  const activeChannelId = channelId ?? channels.data?.[0]?.id;
+  const messages = useQuery({ queryKey: ["messages", activeChannelId], queryFn: () => schoolApi.messages(activeChannelId!), enabled: Boolean(activeChannelId), refetchInterval: 25_000 });
+  const send = useMutation({ mutationFn: () => schoolApi.sendMessage(activeChannelId!, text.trim()), onSuccess: () => { setText(""); client.invalidateQueries({ queryKey: ["messages", activeChannelId] }); } });
+  const selected = channels.data?.find((channel) => channel.id === activeChannelId);
+  return <div className="page"><PageHeader eyebrow="Austausch" title="Chat" />
+    {channels.isLoading ? <LoadingState /> : channels.isError ? <ErrorState onRetry={() => channels.refetch()} /> : !channels.data?.length ? <EmptyState title="Noch kein Chat" description="Sobald du zu einem Klassen- oder Gruppenchat gehörst, erscheint er hier." /> : <div className="grid min-h-[550px] overflow-hidden rounded-[1.1rem] border border-[#e7e7df] bg-white md:grid-cols-[230px_1fr]"><aside className="border-b border-[#e7e7df] bg-[#fbfbf8] md:border-b-0 md:border-r"><div className="border-b border-[#e7e7df] px-4 py-4"><h2>Unterhaltungen</h2></div><nav className="p-2">{channels.data.map((channel) => <button key={channel.id} onClick={() => setChannelId(channel.id)} className={`mb-1 w-full rounded-lg px-3 py-3 text-left text-sm transition-colors ${channel.id === activeChannelId ? "bg-[#e7f1ed] text-[#245c5f]" : "hover:bg-[#f0f1ec]"}`}><strong className="block truncate">{channelLabel(channel)}</strong><span className="mt-1 block text-xs text-[#797e75]">{channel.type === "class" ? "Klasse" : channel.type === "group" ? "Gruppe" : "Direktnachricht"}</span></button>)}</nav></aside><section className="flex min-h-[430px] flex-col"><header className="border-b border-[#e7e7df] px-5 py-4"><h2>{selected ? channelLabel(selected) : "Unterhaltung"}</h2></header>{messages.isLoading ? <LoadingState label="Nachrichten werden geladen" /> : messages.isError ? <ErrorState onRetry={() => messages.refetch()} /> : <><div className="flex flex-1 flex-col justify-end gap-3 overflow-y-auto bg-[#fcfcfa] p-5">{messages.data?.length ? messages.data.slice().reverse().map((message) => { const own = message.sender_id === user?.id; return <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${own ? "self-end rounded-br-sm bg-[#336e72] text-white" : "self-start rounded-bl-sm bg-[#eef0eb] text-[#30362f]"}`} key={message.id}><p>{message.content}</p><time className={`mt-1 block text-[.65rem] ${own ? "text-[#c9e0dc]" : "text-[#72776d]"}`}>{formatDate(message.created_at, { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" })}</time></div> }) : <EmptyState title="Schreib die erste Nachricht" description="Diese Unterhaltung hat noch keine Nachrichten." />}</div><form className="flex gap-2 border-t border-[#e7e7df] p-3" onSubmit={(event) => { event.preventDefault(); if (text.trim()) send.mutate(); }}><input aria-label="Nachricht" className="min-w-0 flex-1 rounded-lg border border-[#dfe1da] px-3 py-2 text-sm" placeholder="Nachricht schreiben …" value={text} onChange={(event) => setText(event.target.value)} /><Button type="submit" loading={send.isPending} disabled={!text.trim()}>Senden</Button></form>{send.isError && <p className="px-4 pb-3 text-xs text-red-600">Die Nachricht konnte nicht gesendet werden.</p>}</>}</section></div>}
+  </div>;
 }
