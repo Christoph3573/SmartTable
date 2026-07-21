@@ -1442,6 +1442,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Erreichbare Personen für einen Chat auflisten */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Kontakte aus gemeinsamen Klassen; Admins sehen alle aktiven Konten */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatContact"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/channels": {
         parameters: {
             query?: never;
@@ -1882,6 +1918,15 @@ export interface components {
             type: "direct" | "class" | "group";
             class_id?: number;
             member_ids?: number[];
+        };
+        ChatContact: {
+            id: number;
+            /** Format: email */
+            email: string;
+            first_name: string;
+            last_name: string;
+            /** @enum {string} */
+            role: "student" | "teacher" | "admin";
         };
         Message: {
             id: number;

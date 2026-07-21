@@ -16,10 +16,15 @@ export type Homework = components["schemas"]["Homework"];
 export type HomeworkSubmission = components["schemas"]["HomeworkSubmission"];
 export type ChatChannel = components["schemas"]["ChatChannel"];
 export type ChatMessage = components["schemas"]["Message"];
+export type ChatContact = components["schemas"]["ChatContact"];
+export type CreateChannelInput = components["schemas"]["CreateChannelRequest"];
 
 export type EventInput = components["schemas"]["CreateEventRequest"];
+export type UpdateEventInput = components["schemas"]["UpdateEventRequest"];
 export type HomeworkInput = components["schemas"]["CreateHomeworkRequest"];
+export type UpdateHomeworkInput = components["schemas"]["UpdateHomeworkRequest"];
 export type SubstitutionInput = components["schemas"]["CreateSubstitutionRequest"];
+export type UpdateSubstitutionInput = components["schemas"]["UpdateSubstitutionRequest"];
 
 export const schoolApi = {
   users: () => apiClient.get<SchoolUser[]>("/api/v1/users").then((r) => r.data),
@@ -55,25 +60,36 @@ export const schoolApi = {
     apiClient.get<Substitution[]>("/api/v1/substitutions", { params }).then((r) => r.data),
   createSubstitution: (data: SubstitutionInput) =>
     apiClient.post<Substitution>("/api/v1/substitutions", data).then((r) => r.data),
+  updateSubstitution: (id: number, data: UpdateSubstitutionInput) =>
+    apiClient.patch<Substitution>(`/api/v1/substitutions/${id}`, data).then((r) => r.data),
   deleteSubstitution: (id: number) => apiClient.delete(`/api/v1/substitutions/${id}`),
 
   events: (params?: { start_date?: string; end_date?: string; class_id?: number }) =>
     apiClient.get<CalendarEvent[]>("/api/v1/events", { params }).then((r) => r.data),
   createEvent: (data: EventInput) => apiClient.post<CalendarEvent>("/api/v1/events", data).then((r) => r.data),
+  updateEvent: (id: number, data: UpdateEventInput) =>
+    apiClient.patch<CalendarEvent>(`/api/v1/events/${id}`, data).then((r) => r.data),
   deleteEvent: (id: number) => apiClient.delete(`/api/v1/events/${id}`),
 
   homework: (classId: number) =>
     apiClient.get<Homework[]>(`/api/v1/classes/${classId}/homework`).then((r) => r.data),
   createHomework: (classId: number, data: HomeworkInput) =>
     apiClient.post<Homework>(`/api/v1/classes/${classId}/homework`, data).then((r) => r.data),
+  updateHomework: (id: number, data: UpdateHomeworkInput) =>
+    apiClient.patch<Homework>(`/api/v1/homework/${id}`, data).then((r) => r.data),
   deleteHomework: (id: number) => apiClient.delete(`/api/v1/homework/${id}`),
   submissions: (homeworkId: number) =>
     apiClient.get<HomeworkSubmission[]>(`/api/v1/homework/${homeworkId}/submissions`).then((r) => r.data),
   submitHomework: (homeworkId: number) =>
     apiClient.post<HomeworkSubmission>(`/api/v1/homework/${homeworkId}/submissions`).then((r) => r.data),
+  gradeSubmission: (submissionId: number, grade: number) =>
+    apiClient.patch<HomeworkSubmission>(`/api/v1/submissions/${submissionId}`, { grade }).then((r) => r.data),
 
   folders: (classId: number) =>
     apiClient.get<FileFolder[]>(`/api/v1/classes/${classId}/folders`).then((r) => r.data),
+  createFolder: (classId: number, data: Pick<FileFolder, "name" | "parent_id">) =>
+    apiClient.post<FileFolder>(`/api/v1/classes/${classId}/folders`, data).then((r) => r.data),
+  deleteFolder: (id: number) => apiClient.delete(`/api/v1/folders/${id}`),
   files: (classId: number, folderId?: number) =>
     apiClient.get<SchoolFile[]>(`/api/v1/classes/${classId}/files`, { params: { folder_id: folderId } }).then((r) => r.data),
   uploadFile: (classId: number, file: File, folderId?: number) => {
@@ -86,6 +102,9 @@ export const schoolApi = {
   deleteFile: (id: number) => apiClient.delete(`/api/v1/files/${id}`),
 
   channels: () => apiClient.get<ChatChannel[]>("/api/v1/channels").then((r) => r.data),
+  chatContacts: () => apiClient.get<ChatContact[]>("/api/v1/chat/contacts").then((r) => r.data),
+  createChannel: (data: CreateChannelInput) =>
+    apiClient.post<ChatChannel>("/api/v1/channels", data).then((r) => r.data),
   messages: (channelId: number) =>
     apiClient.get<ChatMessage[]>(`/api/v1/channels/${channelId}/messages`, { params: { limit: 50 } }).then((r) => r.data),
   sendMessage: (channelId: number, content: string) =>

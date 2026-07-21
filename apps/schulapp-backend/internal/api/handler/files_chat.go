@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"schulapp/internal/api"
+	appmw "schulapp/internal/middleware"
 )
 
 func scanFolder(row interface{ Scan(...any) error }) (api.FileFolder, error) {
@@ -319,6 +320,77 @@ func (h *Server) GetApiV1Channels(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, out)
 }
+
+func (h *Server) GetApiV1ChatContacts(w http.ResponseWriter, r *http.Request) {
+	c := h.claims(w, r)
+	if c == nil {
+		return
+	}
+	query := `SELECT u.id,u.email,u.first_name,u.last_name,u.role
+		FROM users u
+		WHERE u.active AND u.id <> $1`
+	if c.Role != "admin" {
+		query += ` AND EXISTS (
+			SELECT 1
+			FROM (
+				SELECT class_id FROM class_members WHERE user_id=$1
+				UNION SELECT class_id FROM class_teachers WHERE user_id=$1
+			) own_classes
+			JOIN (
+				SELECT class_id FROM class_members WHERE user_id=u.id
+				UNION SELECT class_id FROM class_teachers WHERE user_id=u.id
+			) other_classes USING (class_id)
+		)`
+	}
+	query += ` ORDER BY u.last_name,u.first_name`
+	rows, err := h.DB.QueryContext(r.Context(), query, c.UserID)
+	if err != nil {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	defer rows.Close()
+	contacts := []api.ChatContact{}
+	for rows.Next() {
+		var contact api.ChatContact
+		var role string
+		if err := rows.Scan(&contact.Id, &contact.Email, &contact.FirstName, &contact.LastName, &role); err != nil {
+			writeError(w, 500, "Datenbankfehler")
+			return
+		}
+		contact.Role = api.ChatContactRole(role)
+		contacts = append(contacts, contact)
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	writeJSON(w, 200, contacts)
+}
+
+func (h *Server) canChatWith(r *http.Request, targetID int) bool {
+	c := appmw.GetClaims(r)
+	if c == nil || c.UserID == targetID {
+		return false
+	}
+	var ok bool
+	err := h.DB.QueryRowContext(r.Context(), `SELECT EXISTS(
+		SELECT 1 FROM users u
+		WHERE u.id=$2 AND u.active AND (
+			$3='admin' OR EXISTS (
+				SELECT 1 FROM (
+					SELECT class_id FROM class_members WHERE user_id=$1
+					UNION SELECT class_id FROM class_teachers WHERE user_id=$1
+				) own_classes
+				JOIN (
+					SELECT class_id FROM class_members WHERE user_id=u.id
+					UNION SELECT class_id FROM class_teachers WHERE user_id=u.id
+				) other_classes USING (class_id)
+			)
+		)
+	)`, c.UserID, targetID, c.Role).Scan(&ok)
+	return err == nil && ok
+}
+
 func (h *Server) PostApiV1Channels(w http.ResponseWriter, r *http.Request) {
 	c := h.claims(w, r)
 	if c == nil {
@@ -337,6 +409,39 @@ func (h *Server) PostApiV1Channels(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "Direktchat benötigt genau ein Mitglied")
 		return
 	}
+	if req.Type == api.CreateChannelRequestTypeGroup && (req.MemberIds == nil || len(*req.MemberIds) == 0 || strings.TrimSpace(ptrString(req.Name)) == "") {
+		writeError(w, 400, "Gruppenchat benötigt einen Namen und mindestens ein Mitglied")
+		return
+	}
+	memberIDs := []int{}
+	seen := map[int]bool{}
+	if req.MemberIds != nil {
+		for _, userID := range *req.MemberIds {
+			if seen[userID] || !h.canChatWith(r, userID) {
+				writeError(w, 403, "eine ausgewählte Person ist nicht erreichbar")
+				return
+			}
+			seen[userID] = true
+			memberIDs = append(memberIDs, userID)
+		}
+	}
+	if req.Type == api.CreateChannelRequestTypeDirect {
+		v, err := scanChannel(h.DB.QueryRowContext(r.Context(), `SELECT c.id,c.name,c.type,c.class_id,c.created_at
+			FROM chat_channels c
+			WHERE c.type='direct'
+			AND EXISTS(SELECT 1 FROM chat_members WHERE channel_id=c.id AND user_id=$1)
+			AND EXISTS(SELECT 1 FROM chat_members WHERE channel_id=c.id AND user_id=$2)
+			AND (SELECT COUNT(*) FROM chat_members WHERE channel_id=c.id)=2
+			LIMIT 1`, c.UserID, memberIDs[0]))
+		if err == nil {
+			writeJSON(w, 201, v)
+			return
+		}
+		if err != sql.ErrNoRows {
+			writeError(w, 500, "Datenbankfehler")
+			return
+		}
+	}
 	tx, err := h.DB.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
@@ -348,10 +453,7 @@ func (h *Server) PostApiV1Channels(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}
-	members := []int{c.UserID}
-	if req.MemberIds != nil {
-		members = append(members, *req.MemberIds...)
-	}
+	members := append([]int{c.UserID}, memberIDs...)
 	if req.Type == api.CreateChannelRequestTypeClass {
 		rows, err := tx.QueryContext(r.Context(), `SELECT user_id FROM class_members WHERE class_id=$1 UNION SELECT user_id FROM class_teachers WHERE class_id=$1`, *req.ClassId)
 		if err != nil {
@@ -376,6 +478,13 @@ func (h *Server) PostApiV1Channels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 201, v)
+}
+
+func ptrString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 func (h *Server) channelMember(r *http.Request, channelID int, userID int) bool {
 	var ok bool

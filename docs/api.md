@@ -44,7 +44,7 @@ DELETE /:id/teachers/:uid     Lehrkraft entfernen
 ## Vertretungsplan `/api/v1/substitutions`
 
 ```
-GET    /     ?date=YYYY-MM-DD&classId=
+GET    /     ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&class_id=
 POST   /     Eintrag erstellen (Lehrer/Admin)
 PATCH  /:id  Bearbeiten
 DELETE /:id  Löschen
@@ -53,42 +53,46 @@ DELETE /:id  Löschen
 ## Kalender `/api/v1/events`
 
 ```
-GET    /     ?from=&to=&classId=
+GET    /     ?start_date=&end_date=&class_id=
 POST   /     Termin erstellen (Lehrer)
 PATCH  /:id  Bearbeiten (Ersteller/Admin)
 DELETE /:id  Löschen
 ```
 
-## Dateien `/api/v1/files`
+## Dateien und Ordner
 
 ```
-GET    /folders         Ordnerstruktur
-POST   /folders         Ordner erstellen
-POST   /upload          Datei hochladen (multipart/form-data)
-GET    /:id/download    Datei herunterladen (Auth erforderlich)
-DELETE /:id             Datei löschen
+GET    /api/v1/classes/:id/folders          Ordnerstruktur
+POST   /api/v1/classes/:id/folders          Ordner erstellen
+DELETE /api/v1/folders/:id                  Ordner löschen
+GET    /api/v1/classes/:id/files            Dateien lesen, optional ?folder_id=
+POST   /api/v1/classes/:id/files            Datei hochladen (multipart/form-data)
+GET    /api/v1/files/:id                    Datei herunterladen
+DELETE /api/v1/files/:id                    Datei löschen
 ```
 
 ## Chat `/api/v1/chat`
 
 ```
+GET    /chat/contacts                   Erreichbare Personen aus gemeinsamen Klassen
 GET    /channels                        Eigene Kanäle
-POST   /channels                        Kanal/DM erstellen
+POST   /channels                        Direkt-, Gruppen- oder Klassenchat erstellen
 GET    /channels/:id/messages           Nachrichten (Cursor-Pagination)
 POST   /channels/:id/messages           Nachricht senden
-PATCH  /channels/:id/read               Gelesen-Markierung
 ```
 
-**WebSocket Events:** `send_message` → `new_message`, `typing` → `user_typing`, `mark_read`
+Der Client aktualisiert eine geöffnete Unterhaltung im Zehn-Sekunden-Takt.
+Direkt- und Gruppenchat-Empfänger werden serverseitig auf aktive Personen aus
+gemeinsamen Klassen begrenzt; Admins können alle aktiven Konten erreichen.
 
 ## Hausaufgaben `/api/v1/homework`
 
 ```
-GET    /                   ?classId=&subjectId=&upcoming=true
-POST   /                   Aufgabe erstellen (Lehrer)
-GET    /:id                Details
-PATCH  /:id                Bearbeiten
-POST   /:id/submissions    Abgabe einreichen (Schüler)
-GET    /:id/submissions    Alle Abgaben (Lehrer)
-PATCH  /:id/submissions/:sid  Bewerten (Lehrer)
+GET    /api/v1/classes/:id/homework
+POST   /api/v1/classes/:id/homework
+PATCH  /api/v1/homework/:id
+DELETE /api/v1/homework/:id
+GET    /api/v1/homework/:id/submissions
+POST   /api/v1/homework/:id/submissions
+PATCH  /api/v1/submissions/:id           Abgabe benoten
 ```

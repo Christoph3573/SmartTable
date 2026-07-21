@@ -67,7 +67,10 @@ Die API gliedert sich in:
 - `substitutions`, `events`: Tages- und Terminplanung.
 - `homework`, `submissions`: Aufgaben und Abgabestatus.
 - `files`, `folders`: Klassenmaterial mit persistentem Upload-Speicher.
-- `channels`, `messages`: Mitgliedschaftsgebundene Kurskommunikation.
+- `channels`, `messages`: Mitgliedschaftsgebundene Kurskommunikation. Die
+  Oberfläche erstellt Direkt-, Gruppen- und Klassenunterhaltungen; für
+  Direkt- und Gruppenchat liefert die API ausschließlich aktive Kontakte aus
+  gemeinsamen Klassen und prüft diese Einschränkung auch beim Anlegen.
 
 Die PostgreSQL-Migration `001_initial_schema.up.sql` enthält die Tabellen und
 Fremdschlüssel für diese Domänen. SQL-Abfragen liegen in

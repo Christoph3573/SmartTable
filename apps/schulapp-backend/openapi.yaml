@@ -441,6 +441,23 @@ components:
           items:
             type: integer
 
+    ChatContact:
+      type: object
+      required: [id, email, first_name, last_name, role]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [student, teacher, admin]
+
     Message:
       type: object
       required: [id, channel_id, sender_id, content, created_at]
@@ -1453,6 +1470,22 @@ paths:
       responses:
         "204":
           description: Datei gelöscht
+
+  /api/v1/chat/contacts:
+    get:
+      tags: [chat]
+      summary: Erreichbare Personen für einen Chat auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Kontakte aus gemeinsamen Klassen; Admins sehen alle aktiven Konten
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatContact"
 
   /api/v1/channels:
     get:
