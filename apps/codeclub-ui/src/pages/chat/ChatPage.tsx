@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { schoolApi, type ChatContact, type CreateChannelInput } from "../../api/school";
 import { useAuthStore } from "../../store/authStore";
+import { useChatUiStore } from "../../store/chatUiStore";
 import { Button } from "../../components/ui/Button";
 import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
 import { formatDate } from "../../lib/format";
@@ -19,7 +20,18 @@ export function ChatPage() {
   const contacts = useQuery({ queryKey: ["chat-contacts"], queryFn: schoolApi.chatContacts });
   const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes });
   const activeChannelId = channelId ?? channels.data?.[0]?.id;
-  const messages = useQuery({ queryKey: ["messages", activeChannelId], queryFn: () => schoolApi.messages(activeChannelId!), enabled: Boolean(activeChannelId), refetchInterval: 10_000 });
+  const setActiveChannelId = useChatUiStore((state) => state.setActiveChannelId);
+  useEffect(() => {
+    setActiveChannelId(activeChannelId);
+    return () => setActiveChannelId(undefined);
+  }, [activeChannelId, setActiveChannelId]);
+  const messages = useQuery({ queryKey: ["messages", activeChannelId], queryFn: () => schoolApi.messages(activeChannelId!), enabled: Boolean(activeChannelId) });
+  useEffect(() => {
+    // Fetching messages marks the channel read as a side effect on the backend -
+    // once that lands, refresh the unread badges to reflect it.
+    if (messages.data) client.invalidateQueries({ queryKey: ["channels"] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChannelId, messages.dataUpdatedAt]);
   const send = useMutation({ mutationFn: () => schoolApi.sendMessage(activeChannelId!, text.trim()), onSuccess: () => { setText(""); client.invalidateQueries({ queryKey: ["messages", activeChannelId] }); } });
   const create = useMutation({ mutationFn: schoolApi.createChannel, onSuccess: (channel) => { client.invalidateQueries({ queryKey: ["channels"] }); setChannelId(channel.id); setCreateOpen(false); } });
   const selected = channels.data?.find((channel) => channel.id === activeChannelId);

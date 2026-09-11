@@ -6,11 +6,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"schulapp/internal/api"
 	"schulapp/internal/api/handler"
 	appmw "schulapp/internal/middleware"
+	"schulapp/internal/ws"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -64,7 +66,7 @@ func main() {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowedOrigins:   corsOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
@@ -75,7 +77,7 @@ func main() {
 	r.Use(func(next http.Handler) http.Handler {
 		protected := appmw.Auth(jwtSecret)(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if req.URL.Path == "/health" || req.URL.Path == "/api/v1/health" ||
+			if req.URL.Path == "/health" || req.URL.Path == "/api/v1/health" || req.URL.Path == "/ws" ||
 				req.URL.Path == "/api/v1/auth/login" || req.URL.Path == "/api/v1/auth/refresh" || req.URL.Path == "/api/v1/auth/logout" {
 				next.ServeHTTP(w, req)
 				return
@@ -95,8 +97,11 @@ func main() {
 		LoginLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5),
 		// UPLOAD_DIR is the deployed Compose setting. FILE_STORAGE_PATH remains a
 		// backwards-compatible local override.
-		UploadDir:    envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
+		UploadDir: envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
+		Hub:       ws.NewHub(),
 	}
+
+	r.Get("/ws", srv.HandleWS)
 
 	api.HandlerWithOptions(srv, api.ChiServerOptions{
 		BaseRouter: r,
@@ -112,6 +117,20 @@ func envOrDefault(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// corsOrigins reads a comma-separated CORS_ORIGINS override (needed for LAN/Tailscale
+// access during development); falls back to the default local Vite/CRA dev ports.
+func corsOrigins() []string {
+	raw := os.Getenv("CORS_ORIGINS")
+	if raw == "" {
+		return []string{"http://localhost:5173", "http://localhost:3000"}
+	}
+	origins := strings.Split(raw, ",")
+	for i, o := range origins {
+		origins[i] = strings.TrimSpace(o)
+	}
+	return origins
 }
 
 func seedAdminUser(db *sql.DB) {

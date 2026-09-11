@@ -3,7 +3,12 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -491,7 +496,7 @@ func (h *Server) GetApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *http.Re
 		writeError(w, 403, "keine Berechtigung")
 		return
 	}
-	q := `SELECT id,homework_id,student_id,status,grade,submitted_at,graded_at FROM homework_submissions WHERE homework_id=$1`
+	q := `SELECT id,homework_id,student_id,status,grade,submitted_at,graded_at,file_id FROM homework_submissions WHERE homework_id=$1`
 	args := []any{id}
 	if !manage {
 		q += ` AND student_id=$2`
@@ -509,7 +514,8 @@ func (h *Server) GetApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *http.Re
 		var grade sql.NullFloat64
 		var submitted, graded sql.NullTime
 		var status string
-		if err = rows.Scan(&v.Id, &v.HomeworkId, &v.StudentId, &status, &grade, &submitted, &graded); err != nil {
+		var fileID sql.NullInt64
+		if err = rows.Scan(&v.Id, &v.HomeworkId, &v.StudentId, &status, &grade, &submitted, &graded, &fileID); err != nil {
 			writeError(w, 500, "Datenbankfehler")
 			return
 		}
@@ -525,6 +531,10 @@ func (h *Server) GetApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *http.Re
 		if graded.Valid {
 			x := graded.Time
 			v.GradedAt = &x
+		}
+		if fileID.Valid {
+			x := int(fileID.Int64)
+			v.FileId = &x
 		}
 		out = append(out, v)
 	}
@@ -551,12 +561,141 @@ func (h *Server) PostApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *http.R
 		writeError(w, 403, "kein Zugriff auf diese Klasse")
 		return
 	}
-	_, err = h.DB.ExecContext(r.Context(), `INSERT INTO homework_submissions(homework_id,student_id,status,submitted_at) VALUES($1,$2,'submitted',NOW()) ON CONFLICT(homework_id,student_id) DO UPDATE SET status='submitted',submitted_at=NOW()`, id, c.UserID)
+	var existingStatus string
+	var existingFileID sql.NullInt64
+	err = h.DB.QueryRowContext(r.Context(), `SELECT status,file_id FROM homework_submissions WHERE homework_id=$1 AND student_id=$2`, id, c.UserID).Scan(&existingStatus, &existingFileID)
+	if err != nil && err != sql.ErrNoRows {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	if existingStatus == "graded" {
+		writeError(w, 400, "bereits benotete Abgaben können nicht mehr bearbeitet werden")
+		return
+	}
+	var fileID any
+	newFileID, err := h.uploadSubmissionFile(w, r, hw.ClassId, c.UserID)
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	if newFileID > 0 {
+		fileID = newFileID
+	}
+	var v api.HomeworkSubmission
+	var grade sql.NullFloat64
+	var submitted, graded sql.NullTime
+	var status string
+	var scannedFileID sql.NullInt64
+	err = h.DB.QueryRowContext(r.Context(), `INSERT INTO homework_submissions(homework_id,student_id,status,submitted_at,file_id) VALUES($1,$2,'submitted',NOW(),$3)
+		ON CONFLICT(homework_id,student_id) DO UPDATE SET status='submitted',submitted_at=NOW(),file_id=COALESCE(EXCLUDED.file_id,homework_submissions.file_id)
+		RETURNING id,homework_id,student_id,status,grade,submitted_at,graded_at,file_id`, id, c.UserID, fileID).
+		Scan(&v.Id, &v.HomeworkId, &v.StudentId, &status, &grade, &submitted, &graded, &scannedFileID)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}
-	w.WriteHeader(201)
+	// A replaced attachment leaves the previous upload orphaned - clean it up
+	// now that the new file_id is committed.
+	if newFileID > 0 && existingFileID.Valid && int(existingFileID.Int64) != newFileID {
+		h.deleteFileByID(r, int(existingFileID.Int64))
+	}
+	v.Status = api.HomeworkSubmissionStatus(status)
+	if grade.Valid {
+		x := float32(grade.Float64)
+		v.Grade = &x
+	}
+	if submitted.Valid {
+		x := submitted.Time
+		v.SubmittedAt = &x
+	}
+	if graded.Valid {
+		x := graded.Time
+		v.GradedAt = &x
+	}
+	if scannedFileID.Valid {
+		x := int(scannedFileID.Int64)
+		v.FileId = &x
+	}
+	writeJSON(w, 201, v)
+}
+
+// uploadSubmissionFile reads an optional multipart "file" field and stores it like a
+// regular class file, returning its new id (0 if no file was attached).
+func (h *Server) uploadSubmissionFile(w http.ResponseWriter, r *http.Request, classID int, uploaderID int) (int, error) {
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "multipart/form-data") {
+		return 0, nil
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
+	if err := r.ParseMultipartForm(20 << 20); err != nil {
+		return 0, fmt.Errorf("ungültiger Upload (maximal 20 MB)")
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return 0, nil
+	}
+	defer file.Close()
+	if err = os.MkdirAll(h.UploadDir, 0750); err != nil {
+		return 0, fmt.Errorf("Speicher nicht verfügbar")
+	}
+	safe := filepath.Base(header.Filename)
+	if safe == "." || safe == "" {
+		return 0, fmt.Errorf("ungültiger Dateiname")
+	}
+	tmp, err := os.CreateTemp(h.UploadDir, "upload-*")
+	if err != nil {
+		return 0, fmt.Errorf("Upload konnte nicht gespeichert werden")
+	}
+	size, copyErr := io.Copy(tmp, file)
+	closeErr := tmp.Close()
+	if copyErr != nil || closeErr != nil {
+		os.Remove(tmp.Name())
+		return 0, fmt.Errorf("Upload konnte nicht gespeichert werden")
+	}
+	mime := header.Header.Get("Content-Type")
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	var fileID int
+	err = h.DB.QueryRowContext(r.Context(), `INSERT INTO files(name,path,size,mime_type,uploader_id,class_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`, safe, tmp.Name(), size, mime, uploaderID, classID).Scan(&fileID)
+	if err != nil {
+		os.Remove(tmp.Name())
+		return 0, fmt.Errorf("Datenbankfehler")
+	}
+	return fileID, nil
+}
+func (h *Server) DeleteApiV1SubmissionsId(w http.ResponseWriter, r *http.Request, id int) {
+	c := h.claims(w, r)
+	if c == nil {
+		return
+	}
+	var studentID int
+	var status string
+	var fileID sql.NullInt64
+	err := h.DB.QueryRowContext(r.Context(), `SELECT student_id,status,file_id FROM homework_submissions WHERE id=$1`, id).Scan(&studentID, &status, &fileID)
+	if notFound(w, err, "Abgabe") {
+		return
+	}
+	if err != nil {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	if c.Role != "admin" && (c.Role != "student" || c.UserID != studentID) {
+		writeError(w, 403, "keine Berechtigung")
+		return
+	}
+	if status == "graded" {
+		writeError(w, 400, "bereits benotete Abgaben können nicht zurückgezogen werden")
+		return
+	}
+	_, err = h.DB.ExecContext(r.Context(), `UPDATE homework_submissions SET status='open',submitted_at=NULL,file_id=NULL WHERE id=$1`, id)
+	if err != nil {
+		writeError(w, 500, "Datenbankfehler")
+		return
+	}
+	if fileID.Valid {
+		h.deleteFileByID(r, int(fileID.Int64))
+	}
+	w.WriteHeader(204)
 }
 func (h *Server) PatchApiV1SubmissionsId(w http.ResponseWriter, r *http.Request, id int) {
 	c := h.claims(w, r)
@@ -585,7 +724,8 @@ func (h *Server) PatchApiV1SubmissionsId(w http.ResponseWriter, r *http.Request,
 	var grade sql.NullFloat64
 	var submitted, graded sql.NullTime
 	var status string
-	err = h.DB.QueryRowContext(r.Context(), `UPDATE homework_submissions SET grade=$1,status='graded',graded_at=NOW() WHERE id=$2 RETURNING id,homework_id,student_id,status,grade,submitted_at,graded_at`, req.Grade, id).Scan(&v.Id, &v.HomeworkId, &v.StudentId, &status, &grade, &submitted, &graded)
+	var fileID sql.NullInt64
+	err = h.DB.QueryRowContext(r.Context(), `UPDATE homework_submissions SET grade=$1,status='graded',graded_at=NOW() WHERE id=$2 RETURNING id,homework_id,student_id,status,grade,submitted_at,graded_at,file_id`, req.Grade, id).Scan(&v.Id, &v.HomeworkId, &v.StudentId, &status, &grade, &submitted, &graded, &fileID)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
@@ -602,6 +742,10 @@ func (h *Server) PatchApiV1SubmissionsId(w http.ResponseWriter, r *http.Request,
 	if graded.Valid {
 		x := graded.Time
 		v.GradedAt = &x
+	}
+	if fileID.Valid {
+		x := int(fileID.Int64)
+		v.FileId = &x
 	}
 	writeJSON(w, 200, v)
 }

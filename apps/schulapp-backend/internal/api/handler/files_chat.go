@@ -136,7 +136,10 @@ func (h *Server) GetApiV1ClassesIdFiles(w http.ResponseWriter, r *http.Request, 
 	if !h.requireClassRead(w, r, id) {
 		return
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,name,path,size,mime_type,uploader_id,class_id,folder_id,created_at FROM files WHERE class_id=$1 AND (folder_id=$2 OR $2 IS NULL) ORDER BY created_at DESC`, id, nullableInt(p.FolderId))
+	// Homework submission attachments are stored in the same files table but
+	// live under Hausaufgaben, not the class file library - keep them out of
+	// this listing.
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,name,path,size,mime_type,uploader_id,class_id,folder_id,created_at FROM files WHERE class_id=$1 AND (folder_id=$2 OR $2 IS NULL) AND NOT EXISTS(SELECT 1 FROM homework_submissions hs WHERE hs.file_id=files.id) ORDER BY created_at DESC`, id, nullableInt(p.FolderId))
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
@@ -227,6 +230,20 @@ func (h *Server) PostApiV1ClassesIdFiles(w http.ResponseWriter, r *http.Request,
 func (h *Server) fileByID(r *http.Request, id int) (api.File, string, error) {
 	return scanFile(h.DB.QueryRowContext(r.Context(), `SELECT id,name,path,size,mime_type,uploader_id,class_id,folder_id,created_at FROM files WHERE id=$1`, id))
 }
+
+// deleteFileByID removes a file row and its stored bytes without the usual
+// class-manage permission check - used internally when a submission that
+// owned the file is withdrawn or replaced, so no orphaned upload is left behind.
+func (h *Server) deleteFileByID(r *http.Request, id int) {
+	var path string
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT path FROM files WHERE id=$1`, id).Scan(&path); err != nil {
+		return
+	}
+	if _, err := h.DB.ExecContext(r.Context(), `DELETE FROM files WHERE id=$1`, id); err != nil {
+		return
+	}
+	os.Remove(path)
+}
 func (h *Server) GetApiV1FilesId(w http.ResponseWriter, r *http.Request, id int) {
 	v, path, err := h.fileByID(r, id)
 	if notFound(w, err, "Datei") {
@@ -298,12 +315,36 @@ func scanChannel(row interface{ Scan(...any) error }) (api.ChatChannel, error) {
 	}
 	return v, err
 }
+func scanChannelWithUnread(row interface{ Scan(...any) error }) (api.ChatChannel, int, error) {
+	var v api.ChatChannel
+	var name sql.NullString
+	var classID sql.NullInt64
+	var created time.Time
+	var typ string
+	var unread int
+	err := row.Scan(&v.Id, &name, &typ, &classID, &created, &unread)
+	if err == nil {
+		if name.Valid {
+			x := name.String
+			v.Name = &x
+		}
+		if classID.Valid {
+			x := int(classID.Int64)
+			v.ClassId = &x
+		}
+		v.Type = api.ChatChannelType(typ)
+		v.CreatedAt = &created
+	}
+	return v, unread, err
+}
 func (h *Server) GetApiV1Channels(w http.ResponseWriter, r *http.Request) {
 	c := h.claims(w, r)
 	if c == nil {
 		return
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT c.id,c.name,c.type,c.class_id,c.created_at FROM chat_channels c JOIN chat_members cm ON cm.channel_id=c.id WHERE cm.user_id=$1 ORDER BY c.created_at DESC`, c.UserID)
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT c.id,c.name,c.type,c.class_id,c.created_at,
+		(SELECT COUNT(*) FROM messages m WHERE m.channel_id=c.id AND m.sender_id<>$1 AND m.created_at>COALESCE(cm.last_read_at,'-infinity'))
+		FROM chat_channels c JOIN chat_members cm ON cm.channel_id=c.id WHERE cm.user_id=$1 ORDER BY c.created_at DESC`, c.UserID)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
@@ -311,11 +352,12 @@ func (h *Server) GetApiV1Channels(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	out := []api.ChatChannel{}
 	for rows.Next() {
-		v, err := scanChannel(rows)
+		v, unread, err := scanChannelWithUnread(rows)
 		if err != nil {
 			writeError(w, 500, "Datenbankfehler")
 			return
 		}
+		v.UnreadCount = &unread
 		out = append(out, v)
 	}
 	writeJSON(w, 200, out)
@@ -556,5 +598,19 @@ func (h *Server) PostApiV1ChannelsIdMessages(w http.ResponseWriter, r *http.Requ
 		x := int(fileID.Int64)
 		v.FileId = &x
 	}
+	h.broadcastMessage(id, v)
 	writeJSON(w, 201, v)
+}
+
+// broadcastMessage pushes a new chat message to every member of the channel
+// who currently has a live WebSocket connection open.
+func (h *Server) broadcastMessage(channelID int, msg api.Message) {
+	payload, err := json.Marshal(struct {
+		Type    string      `json:"type"`
+		Message api.Message `json:"message"`
+	}{Type: "message", Message: msg})
+	if err != nil {
+		return
+	}
+	h.Hub.SendToUsers(h.channelMemberIDs(channelID), payload)
 }

@@ -80,10 +80,15 @@ export const schoolApi = {
   deleteHomework: (id: number) => apiClient.delete(`/api/v1/homework/${id}`),
   submissions: (homeworkId: number) =>
     apiClient.get<HomeworkSubmission[]>(`/api/v1/homework/${homeworkId}/submissions`).then((r) => r.data),
-  submitHomework: (homeworkId: number) =>
-    apiClient.post<HomeworkSubmission>(`/api/v1/homework/${homeworkId}/submissions`).then((r) => r.data),
+  submitHomework: (homeworkId: number, file?: File) => {
+    if (!file) return apiClient.post<HomeworkSubmission>(`/api/v1/homework/${homeworkId}/submissions`).then((r) => r.data);
+    const data = new FormData();
+    data.set("file", file);
+    return apiClient.post<HomeworkSubmission>(`/api/v1/homework/${homeworkId}/submissions`, data).then((r) => r.data);
+  },
   gradeSubmission: (submissionId: number, grade: number) =>
     apiClient.patch<HomeworkSubmission>(`/api/v1/submissions/${submissionId}`, { grade }).then((r) => r.data),
+  withdrawSubmission: (submissionId: number) => apiClient.delete(`/api/v1/submissions/${submissionId}`),
 
   folders: (classId: number) =>
     apiClient.get<FileFolder[]>(`/api/v1/classes/${classId}/folders`).then((r) => r.data),
@@ -109,4 +114,8 @@ export const schoolApi = {
     apiClient.get<ChatMessage[]>(`/api/v1/channels/${channelId}/messages`, { params: { limit: 50 } }).then((r) => r.data),
   sendMessage: (channelId: number, content: string) =>
     apiClient.post<ChatMessage>(`/api/v1/channels/${channelId}/messages`, { content }).then((r) => r.data),
+  // Fetching messages marks the channel read as a side effect on the backend;
+  // limit=1 keeps this cheap when it's only used to clear an unread badge.
+  markChannelRead: (channelId: number) =>
+    apiClient.get<ChatMessage[]>(`/api/v1/channels/${channelId}/messages`, { params: { limit: 1 } }),
 };

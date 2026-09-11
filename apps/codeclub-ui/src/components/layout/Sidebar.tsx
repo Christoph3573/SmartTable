@@ -1,5 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../store/authStore";
+import { schoolApi } from "../../api/school";
 import type { Role } from "../../api/auth";
 
 type NavItem = {
@@ -65,6 +67,8 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const channels = useQuery({ queryKey: ["channels"], queryFn: schoolApi.channels, enabled: Boolean(user), refetchInterval: 30_000 });
+  const unreadTotal = channels.data?.reduce((sum, channel) => sum + (channel.unread_count ?? 0), 0) ?? 0;
 
   const filteredItems = navItems.filter(
     (item) => user && item.roles.includes(user.role)
@@ -97,7 +101,12 @@ export function Sidebar() {
                 }
               >
                 {item.icon}
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.to === "/chat" && unreadTotal > 0 && (
+                  <span className="grid min-w-5 place-items-center rounded-full bg-indigo-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                    {unreadTotal > 9 ? "9+" : unreadTotal}
+                  </span>
+                )}
               </NavLink>
             </li>
           ))}

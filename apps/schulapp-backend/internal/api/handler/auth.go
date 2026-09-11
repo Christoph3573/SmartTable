@@ -11,6 +11,7 @@ import (
 
 	"schulapp/internal/api"
 	appmw "schulapp/internal/middleware"
+	"schulapp/internal/ws"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -25,6 +26,7 @@ type Server struct {
 	JWTSecret    []byte
 	LoginLimiter *rate.Limiter
 	UploadDir    string
+	Hub          *ws.Hub
 }
 
 func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {

@@ -424,6 +424,8 @@ components:
         created_at:
           type: string
           format: date-time
+        unread_count:
+          type: integer
 
     CreateChannelRequest:
       type: object
@@ -557,6 +559,8 @@ components:
         graded_at:
           type: string
           format: date-time
+        file_id:
+          type: integer
 
     GradeSubmissionRequest:
       type: object
@@ -1109,9 +1113,23 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
       responses:
         "201":
           description: Abgabe erfolgreich
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomeworkSubmission"
 
   /api/v1/submissions/{id}:
     patch:
@@ -1138,6 +1156,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HomeworkSubmission"
+    delete:
+      tags: [homework]
+      summary: Abgabe zurückziehen (nur solange nicht benotet)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Zurückgezogen
 
   /api/v1/substitutions:
     get:

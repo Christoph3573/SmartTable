@@ -903,14 +903,23 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        file?: string;
+                    };
+                };
+            };
             responses: {
                 /** @description Abgabe erfolgreich */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["HomeworkSubmission"];
+                    };
                 };
             };
         };
@@ -930,7 +939,27 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Abgabe zurückziehen (nur solange nicht benotet) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Zurückgezogen */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         /** Abgabe bewerten */
@@ -1911,6 +1940,7 @@ export interface components {
             class_id?: number;
             /** Format: date-time */
             created_at?: string;
+            unread_count?: number;
         };
         CreateChannelRequest: {
             name?: string;
@@ -1979,6 +2009,7 @@ export interface components {
             submitted_at?: string;
             /** Format: date-time */
             graded_at?: string;
+            file_id?: number;
         };
         GradeSubmissionRequest: {
             /** Format: float */
