@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
-  return <header className="page-header"><div><p className="eyebrow">{eyebrow ?? "SchulApp"}</p><h1>{title}</h1></div>{children && <div className="header-actions">{children}</div>}</header>;
+  return <header className="page-header"><div><p className="eyebrow">{eyebrow ?? "SmartTable"}</p><h1>{title}</h1></div>{children && <div className="header-actions">{children}</div>}</header>;
 }
 
 export function LoadingState({ label = "Daten werden geladen" }: { label?: string }) {

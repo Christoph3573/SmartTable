@@ -83,7 +83,7 @@ export function Sidebar() {
     <aside className="sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       <div className="flex h-20 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
         <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-lg font-bold text-white">S</span>
-        <span className="font-bold tracking-tight text-gray-900 dark:text-white">SchulApp</span>
+        <span className="font-bold tracking-tight text-gray-900 dark:text-white">SmartTable</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4">

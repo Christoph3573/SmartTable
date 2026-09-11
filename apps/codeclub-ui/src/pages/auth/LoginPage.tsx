@@ -27,7 +27,7 @@ export function LoginPage() {
       <div className="rounded-2xl border border-[#e1e3dc] bg-white p-8 shadow-[0_20px_50px_rgba(48,63,52,.08)]">
         <div className="mb-8 text-center">
           <span className="mx-auto mb-4 grid size-11 place-items-center rounded-xl bg-indigo-600 text-2xl font-bold text-white">S</span>
-          <p className="eyebrow">SchulApp</p>
+          <p className="eyebrow">SmartTable</p>
           <h1 className="text-3xl text-[#24283a]">Willkommen zurück</h1>
           <p className="mt-3 text-sm text-[#747a71]">Melde dich an, um deinen Schultag zu öffnen.</p>
         </div>
