@@ -86,6 +86,10 @@ jobs:
 
       - name: Run Ansible Playbook
         working-directory: deploy
+        env:
+          # Read as an env var (not -e on the command line) so it never shows
+          # up in `ps` output on the runner; ansible-core picks this up automatically.
+          ANSIBLE_BECOME_PASS: ${{ secrets.EMANUEL_BECOME_PASS }}
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-emanuel \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
