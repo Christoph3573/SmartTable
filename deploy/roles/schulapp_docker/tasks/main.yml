@@ -52,6 +52,15 @@
     path: "{{ schulapp_project_dir }}"
     state: directory
     mode: "0755"
+    # Owned by the connecting user (not root) so the synchronize/rsync tasks
+    # below can write here without needing sudo - the `synchronize` module
+    # shells out to its own `sudo rsync` when become is on, and that spawns a
+    # non-interactive SSH session that can't be fed the become password even
+    # when ANSIBLE_BECOME_PASS is set for regular become tasks.
+    # ansible_user_id (from fact gathering) is used rather than ansible_user,
+    # since the SSH login user here comes from ~/.ssh/config on the runner,
+    # not an inventory/ansible_user variable, so ansible_user is undefined.
+    owner: "{{ ansible_user_id }}"
 
 - name: docker-compose.yml aus Template erzeugen
   ansible.builtin.template:
@@ -77,6 +86,7 @@
     rsync_opts:
       - "--exclude=.git"
     delete: true
+  become: false
 
 - name: Frontend-Quellcode kopieren (für Docker-Build)
   ansible.posix.synchronize:
@@ -87,6 +97,7 @@
       - "--exclude=node_modules"
       - "--exclude=dist"
     delete: true
+  become: false
 
 - name: Alte exited Container aufräumen (migrate-Container etc.)
   ansible.builtin.command: docker container prune -f
