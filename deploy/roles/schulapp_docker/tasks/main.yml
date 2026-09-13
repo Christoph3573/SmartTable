@@ -61,6 +61,10 @@
     # since the SSH login user here comes from ~/.ssh/config on the runner,
     # not an inventory/ansible_user variable, so ansible_user is undefined.
     owner: "{{ ansible_user_id }}"
+    # recurse fixes ownership of backend/ and frontend/ left root-owned by
+    # earlier deploys (before this task took over rsync's job) - without it,
+    # `file` only touches the top-level directory, not pre-existing children.
+    recurse: true
 
 - name: docker-compose.yml aus Template erzeugen
   ansible.builtin.template:
