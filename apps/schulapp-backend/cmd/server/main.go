@@ -6,10 +6,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"schulapp/internal/api"
 	"schulapp/internal/api/handler"
+	appmw "schulapp/internal/middleware"
+	"schulapp/internal/ws"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -42,7 +45,9 @@ func main() {
 		log.Fatal("DB Ping:", err)
 	}
 
-	seedAdminUser(db)
+	if os.Getenv("DEV_SEED_ADMIN") == "true" {
+		seedAdminUser(db)
+	}
 
 	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
 	if len(jwtSecret) == 0 {
@@ -61,12 +66,25 @@ func main() {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowedOrigins:   corsOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	// The OpenAPI router registers public and protected routes together. Keep the
+	// small public surface explicit and authenticate every other API operation.
+	r.Use(func(next http.Handler) http.Handler {
+		protected := appmw.Auth(jwtSecret)(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.URL.Path == "/health" || req.URL.Path == "/api/v1/health" || req.URL.Path == "/ws" ||
+				req.URL.Path == "/api/v1/auth/login" || req.URL.Path == "/api/v1/auth/refresh" || req.URL.Path == "/api/v1/auth/logout" {
+				next.ServeHTTP(w, req)
+				return
+			}
+			protected.ServeHTTP(w, req)
+		})
+	})
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -77,7 +95,13 @@ func main() {
 		DB:           db,
 		JWTSecret:    jwtSecret,
 		LoginLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5),
+		// UPLOAD_DIR is the deployed Compose setting. FILE_STORAGE_PATH remains a
+		// backwards-compatible local override.
+		UploadDir: envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
+		Hub:       ws.NewHub(),
 	}
+
+	r.Get("/ws", srv.HandleWS)
 
 	api.HandlerWithOptions(srv, api.ChiServerOptions{
 		BaseRouter: r,
@@ -86,6 +110,27 @@ func main() {
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("Server läuft auf http://localhost%s", addr)
 	log.Fatal(http.ListenAndServe(addr, r))
+}
+
+func envOrDefault(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
+}
+
+// corsOrigins reads a comma-separated CORS_ORIGINS override (needed for LAN/Tailscale
+// access during development); falls back to the default local Vite/CRA dev ports.
+func corsOrigins() []string {
+	raw := os.Getenv("CORS_ORIGINS")
+	if raw == "" {
+		return []string{"http://localhost:5173", "http://localhost:3000"}
+	}
+	origins := strings.Split(raw, ",")
+	for i, o := range origins {
+		origins[i] = strings.TrimSpace(o)
+	}
+	return origins
 }
 
 func seedAdminUser(db *sql.DB) {
@@ -108,5 +153,5 @@ func seedAdminUser(db *sql.DB) {
 		log.Printf("seed: Fehler beim Anlegen/Updaten des Admin-Users: %v", err)
 		return
 	}
-	log.Println("seed: Admin-User sichergestellt (admin@schule.de / admin123)")
+	log.Println("seed: Entwicklungs-Admin sichergestellt")
 }

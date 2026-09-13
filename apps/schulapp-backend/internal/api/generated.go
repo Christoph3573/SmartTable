@@ -42,6 +42,27 @@ func (e ChatChannelType) Valid() bool {
 	}
 }
 
+// Defines values for ChatContactRole.
+const (
+	ChatContactRoleAdmin   ChatContactRole = "admin"
+	ChatContactRoleStudent ChatContactRole = "student"
+	ChatContactRoleTeacher ChatContactRole = "teacher"
+)
+
+// Valid indicates whether the value is a known member of the ChatContactRole enum.
+func (e ChatContactRole) Valid() bool {
+	switch e {
+	case ChatContactRoleAdmin:
+		return true
+	case ChatContactRoleStudent:
+		return true
+	case ChatContactRoleTeacher:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ClassMemberRole.
 const (
 	ClassMemberRoleAdmin   ClassMemberRole = "admin"
@@ -126,6 +147,27 @@ func (e CreateSubstitutionRequestType) Valid() bool {
 	case CreateSubstitutionRequestTypeRoomChange:
 		return true
 	case CreateSubstitutionRequestTypeSubstitution:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateUserRequestRole.
+const (
+	CreateUserRequestRoleAdmin   CreateUserRequestRole = "admin"
+	CreateUserRequestRoleStudent CreateUserRequestRole = "student"
+	CreateUserRequestRoleTeacher CreateUserRequestRole = "teacher"
+)
+
+// Valid indicates whether the value is a known member of the CreateUserRequestRole enum.
+func (e CreateUserRequestRole) Valid() bool {
+	switch e {
+	case CreateUserRequestRoleAdmin:
+		return true
+	case CreateUserRequestRoleStudent:
+		return true
+	case CreateUserRequestRoleTeacher:
 		return true
 	default:
 		return false
@@ -249,6 +291,27 @@ func (e UpdateSubstitutionRequestType) Valid() bool {
 	}
 }
 
+// Defines values for UpdateUserRequestRole.
+const (
+	UpdateUserRequestRoleAdmin   UpdateUserRequestRole = "admin"
+	UpdateUserRequestRoleStudent UpdateUserRequestRole = "student"
+	UpdateUserRequestRoleTeacher UpdateUserRequestRole = "teacher"
+)
+
+// Valid indicates whether the value is a known member of the UpdateUserRequestRole enum.
+func (e UpdateUserRequestRole) Valid() bool {
+	switch e {
+	case UpdateUserRequestRoleAdmin:
+		return true
+	case UpdateUserRequestRoleStudent:
+		return true
+	case UpdateUserRequestRoleTeacher:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	UserRoleAdmin   UserRole = "admin"
@@ -281,17 +344,40 @@ type AddTeacherRequest struct {
 	UserId        int   `json:"user_id"`
 }
 
+// BulkCreateUsersRequest defines model for BulkCreateUsersRequest.
+type BulkCreateUsersRequest struct {
+	Users []CreateUserRequest `json:"users"`
+}
+
+// BulkCreateUsersResponse defines model for BulkCreateUsersResponse.
+type BulkCreateUsersResponse struct {
+	Users []User `json:"users"`
+}
+
 // ChatChannel defines model for ChatChannel.
 type ChatChannel struct {
-	ClassId   *int            `json:"class_id,omitempty"`
-	CreatedAt *time.Time      `json:"created_at,omitempty"`
-	Id        int             `json:"id"`
-	Name      *string         `json:"name,omitempty"`
-	Type      ChatChannelType `json:"type"`
+	ClassId     *int            `json:"class_id,omitempty"`
+	CreatedAt   *time.Time      `json:"created_at,omitempty"`
+	Id          int             `json:"id"`
+	Name        *string         `json:"name,omitempty"`
+	Type        ChatChannelType `json:"type"`
+	UnreadCount *int            `json:"unread_count,omitempty"`
 }
 
 // ChatChannelType defines model for ChatChannel.Type.
 type ChatChannelType string
+
+// ChatContact defines model for ChatContact.
+type ChatContact struct {
+	Email     openapi_types.Email `json:"email"`
+	FirstName string              `json:"first_name"`
+	Id        int                 `json:"id"`
+	LastName  string              `json:"last_name"`
+	Role      ChatContactRole     `json:"role"`
+}
+
+// ChatContactRole defines model for ChatContact.Role.
+type ChatContactRole string
 
 // Class defines model for Class.
 type Class struct {
@@ -388,6 +474,18 @@ type CreateSubstitutionRequest struct {
 // CreateSubstitutionRequestType defines model for CreateSubstitutionRequest.Type.
 type CreateSubstitutionRequestType string
 
+// CreateUserRequest defines model for CreateUserRequest.
+type CreateUserRequest struct {
+	Email     openapi_types.Email   `json:"email"`
+	FirstName string                `json:"first_name"`
+	LastName  string                `json:"last_name"`
+	Password  string                `json:"password"`
+	Role      CreateUserRequestRole `json:"role"`
+}
+
+// CreateUserRequestRole defines model for CreateUserRequest.Role.
+type CreateUserRequestRole string
+
 // Error defines model for Error.
 type Error struct {
 	Error string `json:"error"`
@@ -449,6 +547,7 @@ type Homework struct {
 
 // HomeworkSubmission defines model for HomeworkSubmission.
 type HomeworkSubmission struct {
+	FileId      *int                     `json:"file_id,omitempty"`
 	Grade       *float32                 `json:"grade,omitempty"`
 	GradedAt    *time.Time               `json:"graded_at,omitempty"`
 	HomeworkId  int                      `json:"homework_id"`
@@ -564,9 +663,14 @@ type UpdateSubstitutionRequestType string
 
 // UpdateUserRequest defines model for UpdateUserRequest.
 type UpdateUserRequest struct {
-	FirstName *string `json:"first_name,omitempty"`
-	LastName  *string `json:"last_name,omitempty"`
+	FirstName *string                `json:"first_name,omitempty"`
+	LastName  *string                `json:"last_name,omitempty"`
+	Password  *string                `json:"password,omitempty"`
+	Role      *UpdateUserRequestRole `json:"role,omitempty"`
 }
+
+// UpdateUserRequestRole defines model for UpdateUserRequest.Role.
+type UpdateUserRequestRole string
 
 // User defines model for User.
 type User struct {
@@ -603,6 +707,11 @@ type GetApiV1EventsParams struct {
 	StartDate *openapi_types.Date `form:"start_date,omitempty" json:"start_date,omitempty"`
 	EndDate   *openapi_types.Date `form:"end_date,omitempty" json:"end_date,omitempty"`
 	ClassId   *int                `form:"class_id,omitempty" json:"class_id,omitempty"`
+}
+
+// PostApiV1HomeworkIdSubmissionsMultipartBody defines parameters for PostApiV1HomeworkIdSubmissions.
+type PostApiV1HomeworkIdSubmissionsMultipartBody struct {
+	File *openapi_types.File `json:"file,omitempty"`
 }
 
 // GetApiV1SubstitutionsParams defines parameters for GetApiV1Substitutions.
@@ -654,6 +763,9 @@ type PatchApiV1EventsIdJSONRequestBody = UpdateEventRequest
 // PatchApiV1HomeworkIdJSONRequestBody defines body for PatchApiV1HomeworkId for application/json ContentType.
 type PatchApiV1HomeworkIdJSONRequestBody = UpdateHomeworkRequest
 
+// PostApiV1HomeworkIdSubmissionsMultipartRequestBody defines body for PostApiV1HomeworkIdSubmissions for multipart/form-data ContentType.
+type PostApiV1HomeworkIdSubmissionsMultipartRequestBody PostApiV1HomeworkIdSubmissionsMultipartBody
+
 // PostApiV1SubjectsJSONRequestBody defines body for PostApiV1Subjects for application/json ContentType.
 type PostApiV1SubjectsJSONRequestBody = CreateSubjectRequest
 
@@ -667,7 +779,10 @@ type PostApiV1SubstitutionsJSONRequestBody = CreateSubstitutionRequest
 type PatchApiV1SubstitutionsIdJSONRequestBody = UpdateSubstitutionRequest
 
 // PostApiV1UsersJSONRequestBody defines body for PostApiV1Users for application/json ContentType.
-type PostApiV1UsersJSONRequestBody = LoginRequest
+type PostApiV1UsersJSONRequestBody = CreateUserRequest
+
+// PostApiV1UsersBulkJSONRequestBody defines body for PostApiV1UsersBulk for application/json ContentType.
+type PostApiV1UsersBulkJSONRequestBody = BulkCreateUsersRequest
 
 // PatchApiV1UsersIdJSONRequestBody defines body for PatchApiV1UsersId for application/json ContentType.
 type PatchApiV1UsersIdJSONRequestBody = UpdateUserRequest
@@ -701,6 +816,9 @@ type ServerInterface interface {
 	// PostApiV1ChannelsIdMessages Nachricht senden
 	// (POST /api/v1/channels/{id}/messages)
 	PostApiV1ChannelsIdMessages(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1ChatContacts Erreichbare Personen für einen Chat auflisten
+	// (GET /api/v1/chat/contacts)
+	GetApiV1ChatContacts(w http.ResponseWriter, r *http.Request)
 	// GetApiV1Classes Klassen auflisten
 	// (GET /api/v1/classes)
 	GetApiV1Classes(w http.ResponseWriter, r *http.Request)
@@ -794,6 +912,9 @@ type ServerInterface interface {
 	// PostApiV1Subjects Schulfach anlegen
 	// (POST /api/v1/subjects)
 	PostApiV1Subjects(w http.ResponseWriter, r *http.Request)
+	// DeleteApiV1SubmissionsId Abgabe zurückziehen (nur solange nicht benotet)
+	// (DELETE /api/v1/submissions/{id})
+	DeleteApiV1SubmissionsId(w http.ResponseWriter, r *http.Request, id int)
 	// PatchApiV1SubmissionsId Abgabe bewerten
 	// (PATCH /api/v1/submissions/{id})
 	PatchApiV1SubmissionsId(w http.ResponseWriter, r *http.Request, id int)
@@ -815,6 +936,9 @@ type ServerInterface interface {
 	// PostApiV1Users Benutzer anlegen
 	// (POST /api/v1/users)
 	PostApiV1Users(w http.ResponseWriter, r *http.Request)
+	// PostApiV1UsersBulk Mehrere Benutzer anlegen
+	// (POST /api/v1/users/bulk)
+	PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request)
 	// DeleteApiV1UsersId Benutzer löschen
 	// (DELETE /api/v1/users/{id})
 	DeleteApiV1UsersId(w http.ResponseWriter, r *http.Request, id int)
@@ -881,6 +1005,12 @@ func (_ Unimplemented) GetApiV1ChannelsIdMessages(w http.ResponseWriter, r *http
 // PostApiV1ChannelsIdMessages Nachricht senden
 // (POST /api/v1/channels/{id}/messages)
 func (_ Unimplemented) PostApiV1ChannelsIdMessages(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1ChatContacts Erreichbare Personen für einen Chat auflisten
+// (GET /api/v1/chat/contacts)
+func (_ Unimplemented) GetApiV1ChatContacts(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1070,6 +1200,12 @@ func (_ Unimplemented) PostApiV1Subjects(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// DeleteApiV1SubmissionsId Abgabe zurückziehen (nur solange nicht benotet)
+// (DELETE /api/v1/submissions/{id})
+func (_ Unimplemented) DeleteApiV1SubmissionsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // PatchApiV1SubmissionsId Abgabe bewerten
 // (PATCH /api/v1/submissions/{id})
 func (_ Unimplemented) PatchApiV1SubmissionsId(w http.ResponseWriter, r *http.Request, id int) {
@@ -1109,6 +1245,12 @@ func (_ Unimplemented) GetApiV1Users(w http.ResponseWriter, r *http.Request) {
 // PostApiV1Users Benutzer anlegen
 // (POST /api/v1/users)
 func (_ Unimplemented) PostApiV1Users(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1UsersBulk Mehrere Benutzer anlegen
+// (POST /api/v1/users/bulk)
+func (_ Unimplemented) PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1309,6 +1451,20 @@ func (siw *ServerInterfaceWrapper) PostApiV1ChannelsIdMessages(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostApiV1ChannelsIdMessages(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1ChatContacts operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ChatContacts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ChatContacts(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2119,6 +2275,32 @@ func (siw *ServerInterfaceWrapper) PostApiV1Subjects(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteApiV1SubmissionsId operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1SubmissionsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiV1SubmissionsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PatchApiV1SubmissionsId operation middleware
 func (siw *ServerInterfaceWrapper) PatchApiV1SubmissionsId(w http.ResponseWriter, r *http.Request) {
 
@@ -2289,6 +2471,20 @@ func (siw *ServerInterfaceWrapper) PostApiV1Users(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostApiV1Users(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1UsersBulk operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1UsersBulk(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2511,6 +2707,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/users", wrapper.PostApiV1Users)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/users/bulk", wrapper.PostApiV1UsersBulk)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/users/{id}", wrapper.DeleteApiV1UsersId)
 	})
 	r.Group(func(r chi.Router) {
@@ -2571,6 +2770,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/homework/{id}/submissions", wrapper.PostApiV1HomeworkIdSubmissions)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/submissions/{id}", wrapper.DeleteApiV1SubmissionsId)
+	})
+	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/api/v1/submissions/{id}", wrapper.PatchApiV1SubmissionsId)
 	})
 	r.Group(func(r chi.Router) {
@@ -2619,6 +2821,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/files/{id}", wrapper.GetApiV1FilesId)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/chat/contacts", wrapper.GetApiV1ChatContacts)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/channels", wrapper.GetApiV1Channels)
 	})
 	r.Group(func(r chi.Router) {
@@ -2648,59 +2853,64 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"krAEkZwJefb16utVfPP25j8BAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

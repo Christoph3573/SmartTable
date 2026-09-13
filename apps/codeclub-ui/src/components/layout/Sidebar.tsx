@@ -1,5 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../store/authStore";
+import { schoolApi } from "../../api/school";
 import type { Role } from "../../api/auth";
 
 type NavItem = {
@@ -65,6 +67,8 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const channels = useQuery({ queryKey: ["channels"], queryFn: schoolApi.channels, enabled: Boolean(user), refetchInterval: 30_000 });
+  const unreadTotal = channels.data?.reduce((sum, channel) => sum + (channel.unread_count ?? 0), 0) ?? 0;
 
   const filteredItems = navItems.filter(
     (item) => user && item.roles.includes(user.role)
@@ -76,9 +80,10 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-      <div className="flex h-16 items-center border-b border-gray-200 px-6 dark:border-gray-700">
-        <span className="font-semibold text-gray-900 dark:text-white">SchulApp</span>
+    <aside className="sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="flex h-20 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
+        <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-lg font-bold text-white">S</span>
+        <span className="font-bold tracking-tight text-gray-900 dark:text-white">SmartTable</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4">
@@ -88,15 +93,20 @@ export function Sidebar() {
               <NavLink
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                   ${isActive
-                    ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                    ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                   }`
                 }
               >
                 {item.icon}
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.to === "/chat" && unreadTotal > 0 && (
+                  <span className="grid min-w-5 place-items-center rounded-full bg-indigo-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                    {unreadTotal > 9 ? "9+" : unreadTotal}
+                  </span>
+                )}
               </NavLink>
             </li>
           ))}
@@ -105,7 +115,7 @@ export function Sidebar() {
 
       <div className="border-t border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-          <div className="flex size-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-medium text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400">
+          <div className="flex size-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-medium text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
             {user?.first_name?.[0]}{user?.last_name?.[0]}
           </div>
           <div className="flex-1 overflow-hidden">
@@ -118,7 +128,7 @@ export function Sidebar() {
           </div>
           <button
             onClick={handleLogout}
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
             title="Abmelden"
           >
             <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

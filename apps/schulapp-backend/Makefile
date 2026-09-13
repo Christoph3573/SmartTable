@@ -7,7 +7,7 @@ build:
 	go build -o bin/schulapp ./cmd/server/main.go
 
 generate:
-	oapi-codegen --config=oapi-codegen.yaml openapi.yaml
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --config=oapi-codegen.yaml openapi.yaml
 	sqlc generate
 	cd ../codeclub-ui && npm run generate
 

@@ -81,7 +81,7 @@ apps/schulapp-backend/
 
 ## Handler implementieren
 
-Jeder Handler lebt in einer eigenen Datei in `internal/api/handler/`. Das `Server`-Struct embeded `api.Unimplemented` — dadurch sind alle Methoden automatisch mit 501 belegt. Man überschreibt nur die, die man implementieren will.
+Jeder Handler lebt in einer eigenen Datei in `internal/api/handler/`. Das `Server`-Struct embeded `api.Unimplemented`, damit die Implementierung bei einer künftigen Erweiterung des OpenAPI-Vertrags kompiliert. Alle derzeit beschriebenen Endpunkte werden jedoch von konkreten Handlern überschrieben.
 
 ### Beispiel: Subjects
 
@@ -175,7 +175,7 @@ func (h *Server) PostApiV1Subjects(w http.ResponseWriter, r *http.Request) {
 | Fehlender/abgelaufener Token | `401` | `GET /auth/me` ohne `Authorization` |
 | Rate Limit | `429` | 6. Login-Versuch innerhalb 1 Minute |
 | DB-Fehler | `500` | Datenbank nicht erreichbar |
-| Nicht implementiert | `501` | `GET /classes` (noch kein Handler) |
+| Nicht implementiert | `501` | Nur bei einem künftig hinzugefügten, noch nicht überschriebenen OpenAPI-Endpunkt |
 
 Jeder Handler folgt dem gleichen Muster:
 
@@ -288,6 +288,6 @@ Der Docker-Build läuft **auf dem Pi**. `make generate` wird dort **nicht** aufg
 | Tool | Zweck | Installation |
 |---|---|---|
 | Go 1.24+ | Compiler | `apt install golang-1.24-go` |
-| oapi-codegen | Go-Code aus OpenAPI | `go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest` |
+| oapi-codegen | Go-Code aus OpenAPI | `go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --config=oapi-codegen.yaml openapi.yaml` |
 | sqlc | Go-Code aus SQL | `go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest` |
 | golang-migrate | DB-Migrationen | `go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest` |

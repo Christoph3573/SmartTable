@@ -72,6 +72,50 @@ components:
           type: string
         last_name:
           type: string
+        role:
+          type: string
+          enum: [student, teacher, admin]
+        password:
+          type: string
+          minLength: 8
+
+    CreateUserRequest:
+      type: object
+      required: [email, password, first_name, last_name, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [student, teacher, admin]
+
+    BulkCreateUsersRequest:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/CreateUserRequest"
+
+    BulkCreateUsersResponse:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
 
     Class:
       type: object
@@ -380,6 +424,8 @@ components:
         created_at:
           type: string
           format: date-time
+        unread_count:
+          type: integer
 
     CreateChannelRequest:
       type: object
@@ -396,6 +442,23 @@ components:
           type: array
           items:
             type: integer
+
+    ChatContact:
+      type: object
+      required: [id, email, first_name, last_name, role]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [student, teacher, admin]
 
     Message:
       type: object
@@ -496,6 +559,8 @@ components:
         graded_at:
           type: string
           format: date-time
+        file_id:
+          type: integer
 
     GradeSubmissionRequest:
       type: object
@@ -625,7 +690,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              $ref: "#/components/schemas/CreateUserRequest"
       responses:
         "201":
           description: Benutzer angelegt
@@ -633,6 +698,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+
+  /api/v1/users/bulk:
+    post:
+      tags: [users]
+      summary: Mehrere Benutzer anlegen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkCreateUsersRequest"
+      responses:
+        "201":
+          description: Benutzer angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkCreateUsersResponse"
 
   /api/v1/users/{id}:
     get:
@@ -1028,9 +1113,23 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
       responses:
         "201":
           description: Abgabe erfolgreich
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomeworkSubmission"
 
   /api/v1/submissions/{id}:
     patch:
@@ -1057,6 +1156,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HomeworkSubmission"
+    delete:
+      tags: [homework]
+      summary: Abgabe zurückziehen (nur solange nicht benotet)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Zurückgezogen
 
   /api/v1/substitutions:
     get:
@@ -1389,6 +1502,22 @@ paths:
       responses:
         "204":
           description: Datei gelöscht
+
+  /api/v1/chat/contacts:
+    get:
+      tags: [chat]
+      summary: Erreichbare Personen für einen Chat auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Kontakte aus gemeinsamen Klassen; Admins sehen alle aktiven Konten
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatContact"
 
   /api/v1/channels:
     get:

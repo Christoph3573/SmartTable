@@ -1,8 +1,23 @@
 ---
-- name: Session 03 Provision-Gerüst
+- name: SmartTable Basis-Provisionierung
   hosts: webservers
   become: true
   tasks:
-    - name: TODO - optionale Provisioning-Tasks
-      ansible.builtin.debug:
-        msg: "Hier könnt ihr später Provisioning-Schritte sammeln."
+    - name: Basis-Pakete installieren
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - rsync
+          - python3
+        state: present
+        update_cache: true
+
+    - name: Zeitzone auf dem Host setzen
+      community.general.timezone:
+        name: Europe/Berlin
+
+    - name: Systemaktualisierungen ohne Neustart einspielen
+      ansible.builtin.apt:
+        upgrade: safe
+        autoremove: true

@@ -24,11 +24,12 @@ export function LoginPage() {
 
   return (
     <div className="w-full max-w-sm">
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+      <div className="rounded-2xl border border-[#e1e3dc] bg-white p-8 shadow-[0_20px_50px_rgba(48,63,52,.08)]">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Login
-          </h1>
+          <span className="mx-auto mb-4 grid size-11 place-items-center rounded-xl bg-indigo-600 text-2xl font-bold text-white">S</span>
+          <p className="eyebrow">SmartTable</p>
+          <h1 className="text-3xl text-[#24283a]">Willkommen zurück</h1>
+          <p className="mt-3 text-sm text-[#747a71]">Melde dich an, um deinen Schultag zu öffnen.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -55,7 +56,7 @@ export function LoginPage() {
           />
 
           {error && (
-            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
             </div>
           )}

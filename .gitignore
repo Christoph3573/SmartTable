@@ -8,6 +8,8 @@ dist-ssr/
 bin/
 *.exe
 /apps/schulapp-backend/server
+/apps/schulapp-backend/uploads/
+/apps/schulapp-backend/data/
 
 # Env / Secrets
 .env

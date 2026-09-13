@@ -1,8 +1,38 @@
+import { useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { schoolApi } from "../../api/school";
+import { useAuthStore } from "../../store/authStore";
+import { Button } from "../../components/ui/Button";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
+import { formatDate } from "../../lib/format";
+
+const size = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
 export function FilesPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dateien</h1>
-      <p className="mt-2 text-gray-500">Wird in Phase 5 implementiert.</p>
-    </div>
-  );
+  const [classId, setClassId] = useState<number>();
+  const [folderId, setFolderId] = useState<number>();
+  const [folderOpen, setFolderOpen] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const client = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes });
+  const activeClassId = classId ?? classes.data?.[0]?.id;
+  const folders = useQuery({ queryKey: ["folders", activeClassId], queryFn: () => schoolApi.folders(activeClassId!), enabled: Boolean(activeClassId) });
+  const files = useQuery({ queryKey: ["files", activeClassId, folderId], queryFn: () => schoolApi.files(activeClassId!, folderId), enabled: Boolean(activeClassId) });
+  const upload = useMutation({ mutationFn: (file: File) => schoolApi.uploadFile(activeClassId!, file, folderId), onSuccess: () => client.invalidateQueries({ queryKey: ["files", activeClassId] }) });
+  const createFolder = useMutation({ mutationFn: (name: string) => schoolApi.createFolder(activeClassId!, { name, parent_id: folderId }), onSuccess: () => { client.invalidateQueries({ queryKey: ["folders", activeClassId] }); setFolderOpen(false); } });
+  const removeFile = useMutation({ mutationFn: schoolApi.deleteFile, onSuccess: () => client.invalidateQueries({ queryKey: ["files", activeClassId] }) });
+  const removeFolder = useMutation({ mutationFn: schoolApi.deleteFolder, onSuccess: () => { setFolderId(undefined); client.invalidateQueries({ queryKey: ["folders", activeClassId] }); client.invalidateQueries({ queryKey: ["files", activeClassId] }); } });
+  const canManage = user?.role === "teacher" || user?.role === "admin";
+  const activeFolder = folders.data?.find((folder) => folder.id === folderId);
+  const download = async (id: number, name: string) => { const response = await schoolApi.downloadFile(id); const url = URL.createObjectURL(response.data as Blob); const link = document.createElement("a"); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url); };
+  const selectClass = (id: number) => { setClassId(id); setFolderId(undefined); };
+
+  return <div className="page"><PageHeader eyebrow="Materialien" title="Dateien"><select aria-label="Klasse wählen" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" value={activeClassId ?? ""} onChange={(event) => selectClass(Number(event.target.value))}>{classes.data?.map((schoolClass) => <option value={schoolClass.id} key={schoolClass.id}>{schoolClass.name}</option>)}</select>{canManage && <><Button variant="secondary" disabled={!activeClassId} onClick={() => setFolderOpen(true)}>Ordner anlegen</Button><input ref={input} className="hidden" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) upload.mutate(file); event.target.value = ""; }} /><Button loading={upload.isPending} disabled={!activeClassId} onClick={() => input.current?.click()}>Datei hochladen</Button></>}</PageHeader>
+    {classes.isLoading || (activeClassId && (files.isLoading || folders.isLoading)) ? <LoadingState /> : classes.isError || files.isError || folders.isError ? <ErrorState onRetry={() => { classes.refetch(); files.refetch(); folders.refetch(); }} /> : !activeClassId ? <EmptyState title="Keine Klasse verfügbar" description="Sobald du einer Klasse zugeordnet bist, erscheinen die Materialien hier." /> : <div className="grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]"><aside className="overflow-hidden rounded-xl border border-gray-200 bg-white"><div className="border-b border-gray-200 px-4 py-4"><h2 className="text-sm font-semibold text-gray-900">Ordner</h2></div><nav className="p-2"><FolderButton active={!folderId} label="Alle Materialien" meta={`${files.data?.length ?? 0} Dateien`} onClick={() => setFolderId(undefined)} />{folders.data?.map((folder) => <div className="group flex items-center" key={folder.id}><FolderButton active={folder.id === folderId} label={folder.name} meta={folder.parent_id ? "Unterordner" : "Ordner"} onClick={() => setFolderId(folder.id)} />{canManage && <button className="mr-2 hidden rounded px-1.5 py-1 text-xs text-red-600 hover:bg-red-50 group-hover:block" onClick={() => removeFolder.mutate(folder.id)} disabled={removeFolder.isPending}>Löschen</button>}</div>)}</nav></aside><section className="overflow-hidden rounded-xl border border-gray-200 bg-white"><div className="flex items-center justify-between border-b border-gray-200 px-5 py-4"><div><h2 className="text-sm font-semibold text-gray-900">{activeFolder?.name ?? "Alle Materialien"}</h2><p className="mt-0.5 text-xs text-gray-500">{folderId ? "In diesem Ordner" : "Alle Dateien dieser Klasse"}</p></div><span className="text-xs text-gray-500">{files.data?.length ?? 0} Einträge</span></div>{files.data?.length ? files.data.map((file) => <div className="data-row" key={file.id}><span className="grid size-9 place-items-center rounded-lg bg-indigo-50 font-mono text-xs font-semibold text-indigo-700">{file.name.split(".").pop()?.toUpperCase().slice(0, 4) || "FILE"}</span><div className="data-row-main"><strong>{file.name}</strong><p>{size(file.size)} · {file.created_at ? formatDate(file.created_at) : "ohne Datum"}</p></div><button className="text-button" onClick={() => download(file.id, file.name)}>Laden</button>{canManage && <button className="text-button text-red-600" onClick={() => removeFile.mutate(file.id)} disabled={removeFile.isPending}>Löschen</button>}</div>) : <EmptyState title="Dieser Ordner ist leer" description={canManage ? "Lade eine Datei hoch oder lege einen weiteren Ordner an." : "Hier erscheinen Materialien, die deine Lehrkräfte teilen."} />}</section></div>}
+    {folderOpen && <FolderDialog parent={activeFolder?.name} pending={createFolder.isPending} error={createFolder.isError} onClose={() => setFolderOpen(false)} onSubmit={(name) => createFolder.mutate(name)} />}{upload.isError && <p className="mt-3 text-sm text-red-600">Die Datei konnte nicht hochgeladen werden.</p>}
+  </div>;
 }
+
+function FolderButton({ active, label, meta, onClick }: { active: boolean; label: string; meta: string; onClick: () => void }) { return <button className={`mb-1 w-full rounded-lg px-3 py-2.5 text-left ${active ? "bg-indigo-50 text-indigo-800" : "text-gray-700 hover:bg-gray-50"}`} onClick={onClick}><span className="block truncate text-sm font-medium">{label}</span><span className="mt-0.5 block text-xs text-gray-500">{meta}</span></button>; }
+function FolderDialog({ parent, pending, error, onClose, onSubmit }: { parent?: string; pending: boolean; error: boolean; onClose: () => void; onSubmit: (name: string) => void }) { const [name, setName] = useState(""); return <div className="modal-backdrop" role="dialog" aria-modal="true"><form className="modal" onSubmit={(event) => { event.preventDefault(); onSubmit(name); }}><h2>Ordner anlegen</h2><p className="mb-4 text-sm text-gray-500">{parent ? `Der Ordner wird in „${parent}“ angelegt.` : "Der Ordner wird auf der obersten Ebene angelegt."}</p><label className="block text-sm font-medium text-gray-700">Name<input className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>{error && <p className="mt-3 text-sm text-red-600">Der Ordner konnte nicht angelegt werden.</p>}<div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>Abbrechen</Button><Button loading={pending}>Ordner anlegen</Button></div></form></div>; }
