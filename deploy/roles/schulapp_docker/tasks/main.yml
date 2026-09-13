@@ -47,6 +47,17 @@
   ansible.builtin.command: "docker rm -f {{ item }}"
   loop: "{{ port_blocking_containers.stdout_lines }}"
 
+- name: Verbindungs-User ermitteln (ohne become - für rsync-Ownership unten)
+  ansible.builtin.command: whoami
+  register: connect_user
+  changed_when: false
+  become: false
+  # ansible_user_id looked like the right fact for this, but it reflects the
+  # EFFECTIVE user at fact-gathering time - since Gathering Facts inherits
+  # this play's `become: true`, it resolves to "root", not the SSH login
+  # user, making a chown to it a silent no-op. become: false here sidesteps
+  # that and gets the real login user directly.
+
 - name: Projektverzeichnis anlegen
   ansible.builtin.file:
     path: "{{ schulapp_project_dir }}"
@@ -57,10 +68,7 @@
     # shells out to its own `sudo rsync` when become is on, and that spawns a
     # non-interactive SSH session that can't be fed the become password even
     # when ANSIBLE_BECOME_PASS is set for regular become tasks.
-    # ansible_user_id (from fact gathering) is used rather than ansible_user,
-    # since the SSH login user here comes from ~/.ssh/config on the runner,
-    # not an inventory/ansible_user variable, so ansible_user is undefined.
-    owner: "{{ ansible_user_id }}"
+    owner: "{{ connect_user.stdout }}"
     # recurse fixes ownership of backend/ and frontend/ left root-owned by
     # earlier deploys (before this task took over rsync's job) - without it,
     # `file` only touches the top-level directory, not pre-existing children.
