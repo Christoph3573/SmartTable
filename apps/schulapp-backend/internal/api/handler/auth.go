@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"schulapp/internal/api"
@@ -22,11 +24,12 @@ import (
 type Server struct {
 	api.Unimplemented
 
-	DB           *sql.DB
-	JWTSecret    []byte
-	LoginLimiter *rate.Limiter
-	UploadDir    string
-	Hub          *ws.Hub
+	DB               *sql.DB
+	JWTSecret        []byte
+	LoginLimiter     *rate.Limiter
+	RegisterLimiter  *rate.Limiter
+	UploadDir        string
+	Hub              *ws.Hub
 }
 
 func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
@@ -41,14 +44,24 @@ func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Register/CreateUser speichern E-Mails kleingeschrieben+getrimmt;
+	// der Login muss dieselbe Normalisierung anwenden, sonst findet
+	// "Max@Schule.de" den als "max@schule.de" gespeicherten User nicht.
+	email := strings.ToLower(strings.TrimSpace(string(req.Email)))
+
 	var passwordHash string
 	var user api.User
+	var schoolID sql.NullInt64
 
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT password_hash, id, email, first_name, last_name, role
+		`SELECT password_hash, id, email, first_name, last_name, role, school_id
 		 FROM users WHERE email = $1 AND active = true`,
-		req.Email,
-	).Scan(&passwordHash, &user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Role)
+		email,
+	).Scan(&passwordHash, &user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Role, &schoolID)
+	if schoolID.Valid {
+		x := int(schoolID.Int64)
+		user.SchoolId = &x
+	}
 
 	if err == sql.ErrNoRows {
 		writeError(w, http.StatusUnauthorized, "ungültige Anmeldedaten")
@@ -82,6 +95,7 @@ func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
 		user.Id, refreshTokenHash(refreshToken), expiresAt,
 	)
 	if err != nil {
+		log.Printf("login: refresh_token insert failed (user_id=%d): %v", user.Id, err)
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
 		return
 	}
@@ -196,10 +210,15 @@ func (h *Server) GetApiV1AuthMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user api.User
+	var schoolID sql.NullInt64
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT id, email, first_name, last_name, role FROM users WHERE id = $1`,
+		`SELECT id, email, first_name, last_name, role, school_id FROM users WHERE id = $1`,
 		claims.UserID,
-	).Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Role)
+	).Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Role, &schoolID)
+	if schoolID.Valid {
+		x := int(schoolID.Int64)
+		user.SchoolId = &x
+	}
 
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Benutzer nicht gefunden")

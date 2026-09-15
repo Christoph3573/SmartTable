@@ -23,7 +23,7 @@ export function FilesPage() {
   const createFolder = useMutation({ mutationFn: (name: string) => schoolApi.createFolder(activeClassId!, { name, parent_id: folderId }), onSuccess: () => { client.invalidateQueries({ queryKey: ["folders", activeClassId] }); setFolderOpen(false); } });
   const removeFile = useMutation({ mutationFn: schoolApi.deleteFile, onSuccess: () => client.invalidateQueries({ queryKey: ["files", activeClassId] }) });
   const removeFolder = useMutation({ mutationFn: schoolApi.deleteFolder, onSuccess: () => { setFolderId(undefined); client.invalidateQueries({ queryKey: ["folders", activeClassId] }); client.invalidateQueries({ queryKey: ["files", activeClassId] }); } });
-  const canManage = user?.role === "teacher" || user?.role === "admin";
+  const canManage = user?.role === "teacher" || user?.role === "school_admin" || user?.role === "superadmin" || user?.role === "admin";
   const activeFolder = folders.data?.find((folder) => folder.id === folderId);
   const download = async (id: number, name: string) => { const response = await schoolApi.downloadFile(id); const url = URL.createObjectURL(response.data as Blob); const link = document.createElement("a"); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url); };
   const selectClass = (id: number) => { setClassId(id); setFolderId(undefined); };

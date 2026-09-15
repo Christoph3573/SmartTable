@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 
-export type Role = "student" | "teacher" | "admin";
+export type Role = "student" | "teacher" | "school_admin" | "superadmin" | "admin";
 
 export type User = {
   id: number;
@@ -8,6 +8,7 @@ export type User = {
   first_name: string;
   last_name: string;
   role: Role;
+  school_id?: number | null;
 };
 
 export type LoginRequest = {

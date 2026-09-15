@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../store/authStore";
 import { schoolApi } from "../../api/school";
+import { ThemeToggle } from "../ui/ThemeToggle";
 import type { Role } from "../../api/auth";
 
 type NavItem = {
@@ -54,14 +55,16 @@ const UsersIcon = () => (
 );
 
 const navItems: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: <HomeIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/substitutions", label: "Vertretungsplan", icon: <SwapIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/calendar", label: "Kalender", icon: <CalendarIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/files", label: "Dateien", icon: <FolderIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/homework", label: "Hausaufgaben", icon: <BookIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/chat", label: "Chat", icon: <ChatIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/admin/users", label: "Benutzer", icon: <UsersIcon />, roles: ["admin"] },
-  { to: "/admin/classes", label: "Klassen", icon: <UsersIcon />, roles: ["admin", "teacher"] },
+  { to: "/dashboard", label: "Dashboard", icon: <HomeIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/substitutions", label: "Vertretungsplan", icon: <SwapIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/calendar", label: "Kalender", icon: <CalendarIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/files", label: "Dateien", icon: <FolderIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/homework", label: "Hausaufgaben", icon: <BookIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/chat", label: "Chat", icon: <ChatIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/join", label: "Klasse beitreten", icon: <UsersIcon />, roles: ["student"] },
+  { to: "/admin/users", label: "Benutzer", icon: <UsersIcon />, roles: ["superadmin", "admin", "school_admin"] },
+  { to: "/admin/classes", label: "Klassen", icon: <UsersIcon />, roles: ["superadmin", "admin", "school_admin", "teacher"] },
+  { to: "/admin/schools", label: "Schulen", icon: <UsersIcon />, roles: ["superadmin", "admin"] },
 ];
 
 export function Sidebar() {
@@ -84,6 +87,9 @@ export function Sidebar() {
       <div className="flex h-20 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
         <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-lg font-bold text-white">S</span>
         <span className="font-bold tracking-tight text-gray-900 dark:text-white">SmartTable</span>
+        <span className="ml-auto">
+          <ThemeToggle />
+        </span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4">
@@ -123,7 +129,7 @@ export function Sidebar() {
               {user?.first_name} {user?.last_name}
             </p>
             <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-              {user?.role === "student" ? "Schüler" : user?.role === "teacher" ? "Lehrer" : "Admin"}
+              {user?.role === "student" ? "Schüler" : user?.role === "teacher" ? "Lehrer" : user?.role === "school_admin" ? "Schul-Admin" : "Superadmin"}
             </p>
           </div>
           <button

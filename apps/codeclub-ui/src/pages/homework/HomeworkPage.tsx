@@ -29,7 +29,7 @@ export function HomeworkPage() {
     onSuccess: (_, { homeworkId }) => client.invalidateQueries({ queryKey: ["submissions", homeworkId] }),
   });
   const remove = useMutation({ mutationFn: schoolApi.deleteHomework, onSuccess: () => client.invalidateQueries({ queryKey: ["homework", activeClassId] }) });
-  const isTeacher = user?.role === "teacher" || user?.role === "admin";
+  const isTeacher = user?.role === "teacher" || user?.role === "school_admin" || user?.role === "superadmin" || user?.role === "admin";
   const submissionQueries = useQueries({ queries: !isTeacher ? (homework.data ?? []).map((item) => ({ queryKey: ["submissions", item.id], queryFn: () => schoolApi.submissions(item.id) })) : [] });
   const ownSubmission = new Map<number, HomeworkSubmission>();
   (homework.data ?? []).forEach((item, index) => {

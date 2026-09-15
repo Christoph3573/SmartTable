@@ -4,6 +4,7 @@ import { AppLayout } from "../layouts/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RoleRoute } from "./RoleRoute";
 import { LoginPage } from "../pages/auth/LoginPage";
+import { RegisterPage } from "../pages/auth/RegisterPage";
 import { DashboardPage } from "../pages/dashboard/DashboardPage";
 import { SubstitutionsPage } from "../pages/substitutions/SubstitutionsPage";
 import { CalendarPage } from "../pages/calendar/CalendarPage";
@@ -12,12 +13,15 @@ import { HomeworkPage } from "../pages/homework/HomeworkPage";
 import { ChatPage } from "../pages/chat/ChatPage";
 import { UsersPage } from "../pages/admin/UsersPage";
 import { ClassesPage } from "../pages/admin/ClassesPage";
+import { SchoolsPage } from "../pages/admin/SchoolsPage";
+import { JoinClassPage } from "../pages/student/JoinClassPage";
 
 export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
     children: [
       { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
     ],
   },
   {
@@ -33,15 +37,27 @@ export const router = createBrowserRouter([
           { path: "/homework", element: <HomeworkPage /> },
           { path: "/chat", element: <ChatPage /> },
           {
-            element: <RoleRoute allowed={["admin"]} />,
+            element: <RoleRoute allowed={["student"]} />,
+            children: [
+              { path: "/join", element: <JoinClassPage /> },
+            ],
+          },
+          {
+            element: <RoleRoute allowed={["superadmin", "admin", "school_admin"]} />,
             children: [
               { path: "/admin/users", element: <UsersPage /> },
             ],
           },
           {
-            element: <RoleRoute allowed={["admin", "teacher"]} />,
+            element: <RoleRoute allowed={["superadmin", "admin", "school_admin", "teacher"]} />,
             children: [
               { path: "/admin/classes", element: <ClassesPage /> },
+            ],
+          },
+          {
+            element: <RoleRoute allowed={["superadmin", "admin"]} />,
+            children: [
+              { path: "/admin/schools", element: <SchoolsPage /> },
             ],
           },
         ],
