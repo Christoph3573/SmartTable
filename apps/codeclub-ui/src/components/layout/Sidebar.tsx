@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../store/authStore";
 import { schoolApi } from "../../api/school";
+import { ThemeToggle } from "../ui/ThemeToggle";
 import type { Role } from "../../api/auth";
 
 type NavItem = {
@@ -86,6 +87,9 @@ export function Sidebar() {
       <div className="flex h-20 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
         <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-lg font-bold text-white">S</span>
         <span className="font-bold tracking-tight text-gray-900 dark:text-white">SmartTable</span>
+        <span className="ml-auto">
+          <ThemeToggle />
+        </span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4">

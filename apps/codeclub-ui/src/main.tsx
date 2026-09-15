@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import { router } from "./router";
 import { useAuthStore } from "./store/authStore";
+import { useThemeStore } from "./store/themeStore";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,10 +19,12 @@ const queryClient = new QueryClient({
 
 function AppRoot() {
   const initialize = useAuthStore((s) => s.initialize);
+  const initTheme = useThemeStore((s) => s.init);
 
   useEffect(() => {
+    initTheme();
     initialize();
-  }, [initialize]);
+  }, [initTheme, initialize]);
 
   return <RouterProvider router={router} />;
 }
