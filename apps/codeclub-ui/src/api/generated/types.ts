@@ -132,6 +132,234 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Öffentliche Schüler-Registrierung (legt Konto an + optional Beitrittsanfrage) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RegisterRequest"];
+                };
+            };
+            responses: {
+                /** @description Registriert */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["User"];
+                    };
+                };
+                /** @description Ungültige Eingabe */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description E-Mail bereits vergeben */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/schools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Schulen öffentlich auflisten (für Registrierung) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Schulliste */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["School"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/classes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Klassen einer Schule öffentlich auflisten (für Registrierung) */
+        get: {
+            parameters: {
+                query: {
+                    school_id: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Klassenliste */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Class"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/schools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Schulen auflisten */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Schulliste */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["School"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Schule anlegen (nur superadmin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateSchoolRequest"];
+                };
+            };
+            responses: {
+                /** @description Schule angelegt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["School"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/membership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eigene Schul-Zugehörigkeit (Schule, Klassen, offene Anfragen) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Zugehörigkeit */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Membership"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -632,6 +860,142 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/{id}/join-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Beitrittsanfragen einer Klasse auflisten */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Anfragenliste */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JoinRequest"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Beitrittsanfrage stellen (Schüler) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Anfrage gestellt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JoinRequest"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/join-requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Beitrittsanfrage freigeben */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Freigegeben */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JoinRequest"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/join-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Beitrittsanfrage ablehnen */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Abgelehnt */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JoinRequest"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1747,7 +2111,8 @@ export interface components {
             first_name: string;
             last_name: string;
             /** @enum {string} */
-            role: "student" | "teacher" | "admin";
+            role: "student" | "teacher" | "school_admin" | "superadmin";
+            school_id?: number | null;
         };
         LoginRequest: {
             /** Format: email */
@@ -1765,7 +2130,7 @@ export interface components {
             first_name?: string;
             last_name?: string;
             /** @enum {string} */
-            role?: "student" | "teacher" | "admin";
+            role?: "student" | "teacher" | "school_admin" | "superadmin";
             password?: string;
         };
         CreateUserRequest: {
@@ -1775,7 +2140,8 @@ export interface components {
             first_name: string;
             last_name: string;
             /** @enum {string} */
-            role: "student" | "teacher" | "admin";
+            role: "student" | "teacher" | "school_admin" | "superadmin";
+            school_id?: number;
         };
         BulkCreateUsersRequest: {
             users: components["schemas"]["CreateUserRequest"][];
@@ -1787,6 +2153,7 @@ export interface components {
             id: number;
             name: string;
             school_year: string;
+            school_id?: number;
             /** Format: date-time */
             created_at?: string;
         };
@@ -1804,7 +2171,7 @@ export interface components {
             first_name: string;
             last_name: string;
             /** @enum {string} */
-            role: "student" | "teacher" | "admin";
+            role: "student" | "teacher" | "school_admin" | "superadmin";
         };
         ClassTeacher: {
             user_id: number;
@@ -1956,7 +2323,7 @@ export interface components {
             first_name: string;
             last_name: string;
             /** @enum {string} */
-            role: "student" | "teacher" | "admin";
+            role: "student" | "teacher" | "school_admin" | "superadmin";
         };
         Message: {
             id: number;
@@ -2014,6 +2381,44 @@ export interface components {
         GradeSubmissionRequest: {
             /** Format: float */
             grade: number;
+        };
+        School: {
+            id: number;
+            name: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        CreateSchoolRequest: {
+            name: string;
+        };
+        RegisterRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+            first_name: string;
+            last_name: string;
+            school_id: number;
+            requested_class_id?: number;
+        };
+        JoinRequest: {
+            id: number;
+            class_id: number;
+            student_id: number;
+            student_email?: string;
+            student_first_name?: string;
+            student_last_name?: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected";
+            decided_by?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            decided_at?: string;
+        };
+        Membership: {
+            school?: components["schemas"]["School"];
+            classes: components["schemas"]["Class"][];
+            pending: components["schemas"]["JoinRequest"][];
         };
     };
     responses: never;

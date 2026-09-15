@@ -16,6 +16,10 @@ export type Homework = components["schemas"]["Homework"];
 export type HomeworkSubmission = components["schemas"]["HomeworkSubmission"];
 export type ChatChannel = components["schemas"]["ChatChannel"];
 export type ChatMessage = components["schemas"]["Message"];
+export type School = components["schemas"]["School"];
+export type JoinRequest = components["schemas"]["JoinRequest"];
+export type Membership = components["schemas"]["Membership"];
+export type RegisterInput = components["schemas"]["RegisterRequest"];
 export type ChatContact = components["schemas"]["ChatContact"];
 export type CreateChannelInput = components["schemas"]["CreateChannelRequest"];
 
@@ -54,6 +58,31 @@ export const schoolApi = {
     apiClient.post(`/api/v1/classes/${classId}/teachers`, { user_id: userId, is_home_teacher: isHomeTeacher }),
   removeClassTeacher: (classId: number, userId: number) =>
     apiClient.delete(`/api/v1/classes/${classId}/teachers/${userId}`),
+
+  // Public registration + directories (no auth needed)
+  publicSchools: () => apiClient.get<School[]>("/api/v1/public/schools").then((r) => r.data),
+  publicClasses: (schoolId: number) =>
+    apiClient.get<SchoolClass[]>("/api/v1/public/classes", { params: { school_id: schoolId } }).then((r) => r.data),
+  register: (data: RegisterInput) =>
+    apiClient.post<SchoolUser>("/api/v1/auth/register", data).then((r) => r.data),
+
+  // Schools (superadmin creates; staff see own)
+  schools: () => apiClient.get<School[]>("/api/v1/schools").then((r) => r.data),
+  createSchool: (name: string) =>
+    apiClient.post<School>("/api/v1/schools", { name }).then((r) => r.data),
+
+  // Membership banner
+  membership: () => apiClient.get<Membership>("/api/v1/me/membership").then((r) => r.data),
+
+  // Beitrittsanfragen
+  joinRequests: (classId: number) =>
+    apiClient.get<JoinRequest[]>(`/api/v1/classes/${classId}/join-requests`).then((r) => r.data),
+  requestJoin: (classId: number) =>
+    apiClient.post<JoinRequest>(`/api/v1/classes/${classId}/join-requests`).then((r) => r.data),
+  approveJoinRequest: (id: number) =>
+    apiClient.post<JoinRequest>(`/api/v1/join-requests/${id}/approve`).then((r) => r.data),
+  rejectJoinRequest: (id: number) =>
+    apiClient.post<JoinRequest>(`/api/v1/join-requests/${id}/reject`).then((r) => r.data),
 
   subjects: () => apiClient.get<Subject[]>("/api/v1/subjects").then((r) => r.data),
   substitutions: (params?: { date_from?: string; date_to?: string; class_id?: number }) =>

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -10,6 +11,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { registered?: boolean } };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -17,8 +19,15 @@ export function LoginPage() {
     try {
       await login(email, password);
       navigate("/dashboard");
-    } catch {
-      setError("E-Mail oder Passwort ist falsch.");
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        if (status === 429) setError("Zu viele Versuche. Bitte warte einen Moment und versuche es erneut.");
+        else if (status === 401) setError("E-Mail oder Passwort ist falsch.");
+        else setError("Anmeldung fehlgeschlagen. Bitte versuche es erneut.");
+      } else {
+        setError("E-Mail oder Passwort ist falsch.");
+      }
     }
   };
 
@@ -55,6 +64,12 @@ export function LoginPage() {
             autoComplete="current-password"
           />
 
+          {location.state?.registered && !error && (
+            <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+              Konto erstellt. Melde dich jetzt an — deine Klassenanfrage wartet auf Freigabe.
+            </div>
+          )}
+
           {error && (
             <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
@@ -65,6 +80,10 @@ export function LoginPage() {
             Anmelden
           </Button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-gray-500">
+          Noch kein Konto? <Link className="font-semibold text-indigo-700 hover:underline" to="/register">Konto erstellen</Link>
+        </p>
       </div>
     </div>
   );

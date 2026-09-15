@@ -85,3 +85,91 @@ Content-Type: application/json
 
 ### Ohne Token (401)
 GET http://localhost:8080/api/v1/subjects
+
+### ─── Schul-Hierarchie + Beitrittsanfragen (öffentlich, ohne Auth) ───
+
+### Schulen öffentlich (für Registrierung)
+GET http://localhost:8080/api/v1/public/schools
+
+### Klassen einer Schule öffentlich
+GET http://localhost:8080/api/v1/public/classes?school_id=1
+
+### Schüler-Registrierung (201, optional mit Beitrittsanfrage)
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "neu.schueler@schule.de",
+  "password": "schueler123",
+  "first_name": "Neu",
+  "last_name": "Schueler",
+  "school_id": 1,
+  "requested_class_id": 1
+}
+
+### Schüler-Registrierung doppelt (409)
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "neu.schueler@schule.de",
+  "password": "schueler123",
+  "first_name": "Neu",
+  "last_name": "Schueler",
+  "school_id": 1
+}
+
+### ─── Als Superadmin (admin@schule.de) ───
+
+### Schule anlegen (nur superadmin)
+POST http://localhost:8080/api/v1/schools
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Gymnasium Musterstadt"
+}
+
+### Schulen auflisten
+GET http://localhost:8080/api/v1/schools
+Authorization: Bearer {{accessToken}}
+
+### Schul-Admin anlegen (superadmin; school_id = Zielschule)
+POST http://localhost:8080/api/v1/users
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "schuladmin@schule.de",
+  "password": "schuladmin123",
+  "first_name": "Schul",
+  "last_name": "Admin",
+  "role": "school_admin",
+  "school_id": 1
+}
+
+### ─── Als Schüler ───
+@studentToken = PASTE_STUDENT_TOKEN_HERE
+
+### Eigene Zugehörigkeit (Schule, Klassen, offene Anfragen)
+GET http://localhost:8080/api/v1/me/membership
+Authorization: Bearer {{studentToken}}
+
+### Beitrittsanfrage stellen
+POST http://localhost:8080/api/v1/classes/1/join-requests
+Authorization: Bearer {{studentToken}}
+
+### ─── Als Lehrer / Schul-Admin ───
+@staffToken = PASTE_STAFF_TOKEN_HERE
+
+### Anfragen einer Klasse auflisten
+GET http://localhost:8080/api/v1/classes/1/join-requests
+Authorization: Bearer {{staffToken}}
+
+### Anfrage freigeben (Transaktion -> class_members)
+POST http://localhost:8080/api/v1/join-requests/1/approve
+Authorization: Bearer {{staffToken}}
+
+### Anfrage ablehnen
+POST http://localhost:8080/api/v1/join-requests/1/reject
+Authorization: Bearer {{staffToken}}

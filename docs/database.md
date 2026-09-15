@@ -1,12 +1,25 @@
 # Datenbankschema
 
+## Rollen-Hierarchie
+
+```
+superadmin → school_admin → teacher → student
+```
+
+- **superadmin** (Plattform): Schulen + Schul-Admins anlegen, alles.
+- **school_admin**: Lehrer der eigenen Schule anlegen, Klassen anlegen, Beitrittsanfragen der eigenen Schule freigeben.
+- **teacher**: Klassen der eigenen Schule anlegen, Anfragen eigener Klassen freigeben.
+- **student**: öffentliche Registrierung, Schule + Klasse wählen, Beitrittsanfrage stellen.
+
 ## Kern-Tabellen
 
 ```sql
-users           → id, email, password, role (student|teacher|admin), first_name, last_name
-classes         → id, name, school_year
+schools         → id, name UNIQUE
+users           → id, email, password, role (student|teacher|school_admin|superadmin), first_name, last_name, school_id → schools (NULL bei superadmin)
+classes         → id, name, school_year, school_id → schools NOT NULL
 class_members   → class_id, user_id
 class_teachers  → class_id, user_id, is_home_teacher
+class_join_requests → id, class_id, student_id, status (pending|approved|rejected), decided_by, UNIQUE(class_id, student_id)
 subjects        → id, name, short
 refresh_tokens  → id, user_id, token, expires_at
 ```

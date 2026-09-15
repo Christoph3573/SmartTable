@@ -40,7 +40,7 @@ func main() {
 	users := []struct {
 		email, pw, first, last, role string
 	}{
-		{"admin@schule.de", "admin123", "Admin", "Schule", "admin"},
+		{"admin@schule.de", "admin123", "Admin", "Schule", "superadmin"},
 		{"mueller@schule.de", "lehrer123", "Hans", "Müller", "teacher"},
 		{"schmidt@schule.de", "lehrer123", "Anna", "Schmidt", "teacher"},
 		{"weber@schule.de", "lehrer123", "Klaus", "Weber", "teacher"},
@@ -59,8 +59,8 @@ func main() {
 
 	for _, u := range users {
 		_, err := db.Exec(
-			`INSERT INTO users (email, password_hash, first_name, last_name, role)
-			 VALUES ($1, $2, $3, $4, $5)
+			`INSERT INTO users (email, password_hash, first_name, last_name, role, school_id)
+			 VALUES ($1, $2, $3, $4, $5, (SELECT id FROM schools WHERE name='Musterschule'))
 			 ON CONFLICT (email) DO NOTHING`,
 			u.email, hash(u.pw), u.first, u.last, u.role,
 		)
@@ -70,11 +70,14 @@ func main() {
 			fmt.Printf("✓ %s (%s)\n", u.email, u.role)
 		}
 	}
+	// Superadmin gehört zu keiner Schule.
+	_, _ = db.Exec(`UPDATE users SET school_id=NULL WHERE role='superadmin'`)
 
 	// Klasse anlegen
 	var classID int
 	err = db.QueryRow(
-		`INSERT INTO classes (name, school_year) VALUES ('10a', '2025/26')
+		`INSERT INTO classes (name, school_year, school_id)
+		 VALUES ('10a', '2025/26', (SELECT id FROM schools WHERE name='Musterschule'))
 		 ON CONFLICT DO NOTHING RETURNING id`,
 	).Scan(&classID)
 	if err != nil && err != sql.ErrNoRows {

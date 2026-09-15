@@ -98,7 +98,7 @@ func (h *Server) GetApiV1Substitutions(w http.ResponseWriter, r *http.Request, p
 	if p.DateTo != nil {
 		to = p.DateTo.Time
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,date,period,class_id,subject_id,original_teacher_id,sub_teacher_id,room,type,note,created_at FROM substitutions WHERE (date >= $1::date OR $1::date IS NULL) AND (date <= $2::date OR $2::date IS NULL) AND (class_id=$3 OR $3 IS NULL) AND ($4='admin' OR class_id IS NULL OR EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=substitutions.class_id AND cm.user_id=$5) OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=substitutions.class_id AND ct.user_id=$5)) ORDER BY date,period`, from, to, nullableInt(p.ClassId), c.Role, c.UserID)
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,date,period,class_id,subject_id,original_teacher_id,sub_teacher_id,room,type,note,created_at FROM substitutions WHERE (date >= $1::date OR $1::date IS NULL) AND (date <= $2::date OR $2::date IS NULL) AND (class_id=$3 OR $3 IS NULL) AND ($4='superadmin' OR $4='admin' OR class_id IS NULL OR EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=substitutions.class_id AND cm.user_id=$5) OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=substitutions.class_id AND ct.user_id=$5)) ORDER BY date,period`, from, to, nullableInt(p.ClassId), c.Role, c.UserID)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
@@ -116,7 +116,7 @@ func (h *Server) GetApiV1Substitutions(w http.ResponseWriter, r *http.Request, p
 	writeJSON(w, 200, out)
 }
 func (h *Server) PostApiV1Substitutions(w http.ResponseWriter, r *http.Request) {
-	if !requireRole(w, h.claims(w, r), "teacher", "admin") {
+	if !requireRole(w, h.claims(w, r), "teacher", "superadmin") {
 		return
 	}
 	var req api.CreateSubstitutionRequest
@@ -147,7 +147,7 @@ func (h *Server) substitutionClass(r *http.Request, id int) (int, error) {
 	return int(classID.Int64), nil
 }
 func (h *Server) PatchApiV1SubstitutionsId(w http.ResponseWriter, r *http.Request, id int) {
-	if !requireRole(w, h.claims(w, r), "teacher", "admin") {
+	if !requireRole(w, h.claims(w, r), "teacher", "superadmin") {
 		return
 	}
 	old, err := h.substitutionClass(r, id)
@@ -183,7 +183,7 @@ func (h *Server) PatchApiV1SubstitutionsId(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, 200, v)
 }
 func (h *Server) DeleteApiV1SubstitutionsId(w http.ResponseWriter, r *http.Request, id int) {
-	if !requireRole(w, h.claims(w, r), "teacher", "admin") {
+	if !requireRole(w, h.claims(w, r), "teacher", "superadmin") {
 		return
 	}
 	classID, err := h.substitutionClass(r, id)
@@ -240,7 +240,7 @@ func (h *Server) GetApiV1Events(w http.ResponseWriter, r *http.Request, p api.Ge
 	if p.EndDate != nil {
 		end = p.EndDate.Time.AddDate(0, 0, 1)
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,title,start_time,end_time,all_day,type,class_id,creator_id,created_at FROM events WHERE (start_time >= $1 OR $1 IS NULL) AND (end_time <= $2 OR $2 IS NULL) AND (class_id=$3 OR $3 IS NULL) AND ($4='admin' OR class_id IS NULL OR EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=events.class_id AND cm.user_id=$5) OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=events.class_id AND ct.user_id=$5)) ORDER BY start_time`, start, end, nullableInt(p.ClassId), c.Role, c.UserID)
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,title,start_time,end_time,all_day,type,class_id,creator_id,created_at FROM events WHERE (start_time >= $1 OR $1 IS NULL) AND (end_time <= $2 OR $2 IS NULL) AND (class_id=$3 OR $3 IS NULL) AND ($4='superadmin' OR $4='admin' OR class_id IS NULL OR EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=events.class_id AND cm.user_id=$5) OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=events.class_id AND ct.user_id=$5)) ORDER BY start_time`, start, end, nullableInt(p.ClassId), c.Role, c.UserID)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
@@ -259,7 +259,7 @@ func (h *Server) GetApiV1Events(w http.ResponseWriter, r *http.Request, p api.Ge
 }
 func (h *Server) PostApiV1Events(w http.ResponseWriter, r *http.Request) {
 	c := h.claims(w, r)
-	if !requireRole(w, c, "teacher", "admin") {
+	if !requireRole(w, c, "teacher", "superadmin") {
 		return
 	}
 	var req api.CreateEventRequest
@@ -289,7 +289,7 @@ func (h *Server) eventAccess(r *http.Request, id int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if c.Role == "admin" || (creator.Valid && int(creator.Int64) == c.UserID) {
+	if isSuperadmin(c.Role) || (creator.Valid && int(creator.Int64) == c.UserID) {
 		return true, nil
 	}
 	return classID.Valid && h.canManageClass(r, int(classID.Int64)), nil
@@ -422,7 +422,7 @@ func (h *Server) homeworkAccess(r *http.Request, id int) (api.Homework, bool, er
 		return v, false, err
 	}
 	c := appmw.GetClaims(r)
-	return v, c.Role == "admin" || v.TeacherId == c.UserID || h.canManageClass(r, v.ClassId), nil
+	return v, isSuperadmin(c.Role) || v.TeacherId == c.UserID || h.canManageClass(r, v.ClassId), nil
 }
 func (h *Server) PatchApiV1HomeworkId(w http.ResponseWriter, r *http.Request, id int) {
 	if h.claims(w, r) == nil {
@@ -679,7 +679,7 @@ func (h *Server) DeleteApiV1SubmissionsId(w http.ResponseWriter, r *http.Request
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}
-	if c.Role != "admin" && (c.Role != "student" || c.UserID != studentID) {
+	if !isSuperadmin(c.Role) && (c.Role != "student" || c.UserID != studentID) {
 		writeError(w, 403, "keine Berechtigung")
 		return
 	}
@@ -699,7 +699,7 @@ func (h *Server) DeleteApiV1SubmissionsId(w http.ResponseWriter, r *http.Request
 }
 func (h *Server) PatchApiV1SubmissionsId(w http.ResponseWriter, r *http.Request, id int) {
 	c := h.claims(w, r)
-	if !requireRole(w, c, "teacher", "admin") {
+	if !requireRole(w, c, "teacher", "superadmin") {
 		return
 	}
 	var classID int

@@ -19,7 +19,12 @@ import (
 func scanClass(row interface{ Scan(...any) error }) (api.Class, error) {
 	var v api.Class
 	var created time.Time
-	err := row.Scan(&v.Id, &v.Name, &v.SchoolYear, &created)
+	var schoolID sql.NullInt64
+	err := row.Scan(&v.Id, &v.Name, &v.SchoolYear, &schoolID, &created)
+	if schoolID.Valid {
+		x := int(schoolID.Int64)
+		v.SchoolId = &x
+	}
 	v.CreatedAt = &created
 	return v, err
 }
@@ -29,13 +34,35 @@ func (h *Server) GetApiV1Classes(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
-	query := `SELECT id,name,school_year,created_at FROM classes`
+	// superadmin/school_admin see all classes in scope (school), everyone else
+	// only their member/assigned classes.
+	query := `SELECT id,name,school_year,school_id,created_at FROM classes`
 	args := []any{}
-	if c.Role != "admin" {
+	var where []string
+	if isSuperadmin(c.Role) {
+		// no filter
+	} else if c.Role == RoleSchoolAdmin {
+		own, ok := h.ownSchoolID(r)
+		if !ok {
+			writeError(w, 403, "keine Schule zugeordnet")
+			return
+		}
+		where = append(where, `school_id=$1`)
+		args = append(args, own)
+	} else {
 		query += ` WHERE EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=classes.id AND cm.user_id=$1) OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=classes.id AND ct.user_id=$1)`
 		args = append(args, c.UserID)
+		h.queryClasses(w, r, query+` ORDER BY name`, args...)
+		return
+	}
+	if len(where) > 0 {
+		query += ` WHERE ` + strings.Join(where, " AND ")
 	}
 	query += ` ORDER BY name`
+	h.queryClasses(w, r, query, args...)
+}
+
+func (h *Server) queryClasses(w http.ResponseWriter, r *http.Request, query string, args ...any) {
 	rows, err := h.DB.QueryContext(r.Context(), query, args...)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
@@ -59,7 +86,8 @@ func (h *Server) GetApiV1Classes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Server) PostApiV1Classes(w http.ResponseWriter, r *http.Request) {
-	if !requireRole(w, h.claims(w, r), "admin") {
+	c := h.claims(w, r)
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin, RoleTeacher) {
 		return
 	}
 	var req api.CreateClassRequest
@@ -67,7 +95,25 @@ func (h *Server) PostApiV1Classes(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "name und school_year sind erforderlich")
 		return
 	}
-	v, err := scanClass(h.DB.QueryRowContext(r.Context(), `INSERT INTO classes(name,school_year) VALUES($1,$2) RETURNING id,name,school_year,created_at`, strings.TrimSpace(req.Name), strings.TrimSpace(req.SchoolYear)))
+	// school_id comes from the caller's profile, never from the body.
+	var schoolID int
+	if isSuperadmin(c.Role) {
+		// Superadmins without a school fall back to the first school so
+		// classes always belong somewhere.
+		err := h.DB.QueryRowContext(r.Context(), `SELECT id FROM schools ORDER BY id LIMIT 1`).Scan(&schoolID)
+		if err != nil {
+			writeError(w, 500, "keine Schule vorhanden")
+			return
+		}
+	} else {
+		own, ok := h.ownSchoolID(r)
+		if !ok {
+			writeError(w, 403, "keine Schule zugeordnet")
+			return
+		}
+		schoolID = own
+	}
+	v, err := scanClass(h.DB.QueryRowContext(r.Context(), `INSERT INTO classes(name,school_year,school_id) VALUES($1,$2,$3) RETURNING id,name,school_year,school_id,created_at`, strings.TrimSpace(req.Name), strings.TrimSpace(req.SchoolYear), schoolID))
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
@@ -79,7 +125,7 @@ func (h *Server) GetApiV1ClassesId(w http.ResponseWriter, r *http.Request, id in
 	if !h.requireClassRead(w, r, id) {
 		return
 	}
-	v, err := scanClass(h.DB.QueryRowContext(r.Context(), `SELECT id,name,school_year,created_at FROM classes WHERE id=$1`, id))
+	v, err := scanClass(h.DB.QueryRowContext(r.Context(), `SELECT id,name,school_year,school_id,created_at FROM classes WHERE id=$1`, id))
 	if notFound(w, err, "Klasse") {
 		return
 	}
@@ -99,7 +145,7 @@ func (h *Server) PatchApiV1ClassesId(w http.ResponseWriter, r *http.Request, id 
 		writeError(w, 400, "ungültiges JSON")
 		return
 	}
-	v, err := scanClass(h.DB.QueryRowContext(r.Context(), `UPDATE classes SET name=COALESCE($1,name),school_year=COALESCE($2,school_year) WHERE id=$3 RETURNING id,name,school_year,created_at`, req.Name, req.SchoolYear, id))
+	v, err := scanClass(h.DB.QueryRowContext(r.Context(), `UPDATE classes SET name=COALESCE($1,name),school_year=COALESCE($2,school_year) WHERE id=$3 RETURNING id,name,school_year,school_id,created_at`, req.Name, req.SchoolYear, id))
 	if notFound(w, err, "Klasse") {
 		return
 	}
@@ -111,8 +157,15 @@ func (h *Server) PatchApiV1ClassesId(w http.ResponseWriter, r *http.Request, id 
 }
 
 func (h *Server) DeleteApiV1ClassesId(w http.ResponseWriter, r *http.Request, id int) {
-	if !requireRole(w, h.claims(w, r), "admin") {
+	c := h.claims(w, r)
+	// Delete stays privileged: superadmin everywhere, school_admin in own school.
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin) {
 		return
+	}
+	if !isSuperadmin(c.Role) {
+		if _, ok := h.requireClassSchool(w, r, id); !ok {
+			return
+		}
 	}
 	res, err := h.DB.ExecContext(r.Context(), `DELETE FROM classes WHERE id=$1`, id)
 	if err != nil {
@@ -158,7 +211,8 @@ func (h *Server) PostApiV1ClassesIdMembers(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var role string
-	err := h.DB.QueryRowContext(r.Context(), `SELECT role FROM users WHERE id=$1 AND active`, req.UserId).Scan(&role)
+	var targetSchool sql.NullInt64
+	err := h.DB.QueryRowContext(r.Context(), `SELECT role, school_id FROM users WHERE id=$1 AND active`, req.UserId).Scan(&role, &targetSchool)
 	if notFound(w, err, "Benutzer") {
 		return
 	}
@@ -169,6 +223,17 @@ func (h *Server) PostApiV1ClassesIdMembers(w http.ResponseWriter, r *http.Reques
 	if role != "student" {
 		writeError(w, 400, "nur Schüler können Klassenmitglieder sein")
 		return
+	}
+	if _, ok := h.requireClassSchool(w, r, id); !ok {
+		return
+	}
+	// Members must belong to the class' school.
+	if targetSchool.Valid {
+		schoolID, _ := h.classSchoolID(r, id)
+		if int(targetSchool.Int64) != schoolID {
+			writeError(w, 400, "Schüler gehört zu einer anderen Schule")
+			return
+		}
 	}
 	_, err = h.DB.ExecContext(r.Context(), `INSERT INTO class_members(class_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, id, req.UserId)
 	if err != nil {
@@ -210,8 +275,14 @@ func (h *Server) GetApiV1ClassesIdTeachers(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, 200, out)
 }
 func (h *Server) PostApiV1ClassesIdTeachers(w http.ResponseWriter, r *http.Request, id int) {
-	if !requireRole(w, h.claims(w, r), "admin") {
+	c := h.claims(w, r)
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin) {
 		return
+	}
+	if !isSuperadmin(c.Role) {
+		if _, ok := h.requireClassSchool(w, r, id); !ok {
+			return
+		}
 	}
 	var req api.AddTeacherRequest
 	if json.NewDecoder(r.Body).Decode(&req) != nil || req.UserId < 1 {
@@ -219,7 +290,8 @@ func (h *Server) PostApiV1ClassesIdTeachers(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var role string
-	err := h.DB.QueryRowContext(r.Context(), `SELECT role FROM users WHERE id=$1 AND active`, req.UserId).Scan(&role)
+	var targetSchool sql.NullInt64
+	err := h.DB.QueryRowContext(r.Context(), `SELECT role, school_id FROM users WHERE id=$1 AND active`, req.UserId).Scan(&role, &targetSchool)
 	if notFound(w, err, "Benutzer") {
 		return
 	}
@@ -230,6 +302,13 @@ func (h *Server) PostApiV1ClassesIdTeachers(w http.ResponseWriter, r *http.Reque
 	if role != "teacher" {
 		writeError(w, 400, "nur Lehrkräfte können zugewiesen werden")
 		return
+	}
+	if !isSuperadmin(c.Role) && targetSchool.Valid {
+		schoolID, _ := h.classSchoolID(r, id)
+		if int(targetSchool.Int64) != schoolID {
+			writeError(w, 400, "Lehrkraft gehört zu einer anderen Schule")
+			return
+		}
 	}
 	home := false
 	if req.IsHomeTeacher != nil {
@@ -243,8 +322,14 @@ func (h *Server) PostApiV1ClassesIdTeachers(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(201)
 }
 func (h *Server) DeleteApiV1ClassesIdTeachersUserId(w http.ResponseWriter, r *http.Request, id, userID int) {
-	if !requireRole(w, h.claims(w, r), "admin") {
+	c := h.claims(w, r)
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin) {
 		return
+	}
+	if !isSuperadmin(c.Role) {
+		if _, ok := h.requireClassSchool(w, r, id); !ok {
+			return
+		}
 	}
 	_, err := h.DB.ExecContext(r.Context(), `DELETE FROM class_teachers WHERE class_id=$1 AND user_id=$2`, id, userID)
 	if err != nil {
@@ -256,14 +341,39 @@ func (h *Server) DeleteApiV1ClassesIdTeachersUserId(w http.ResponseWriter, r *ht
 
 func scanUser(row interface{ Scan(...any) error }) (api.User, error) {
 	var u api.User
-	err := row.Scan(&u.Id, &u.Email, &u.FirstName, &u.LastName, &u.Role)
+	var schoolID sql.NullInt64
+	err := row.Scan(&u.Id, &u.Email, &u.FirstName, &u.LastName, &u.Role, &schoolID)
+	if schoolID.Valid {
+		x := int(schoolID.Int64)
+		u.SchoolId = &x
+	}
 	return u, err
 }
+
+const userSelect = `SELECT id,email,first_name,last_name,role,school_id FROM users`
+
 func (h *Server) GetApiV1Users(w http.ResponseWriter, r *http.Request) {
-	if !requireRole(w, h.claims(w, r), "admin") {
+	c := h.claims(w, r)
+	if c == nil {
 		return
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,email,first_name,last_name,role FROM users WHERE active ORDER BY last_name,first_name`)
+	// superadmin: all; school_admin: teachers (+students read-only scope) of own school.
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin) {
+		return
+	}
+	query := userSelect + ` WHERE active`
+	args := []any{}
+	if !isSuperadmin(c.Role) {
+		own, ok := h.ownSchoolID(r)
+		if !ok {
+			writeError(w, 403, "keine Schule zugeordnet")
+			return
+		}
+		query += ` AND school_id=$1`
+		args = append(args, own)
+	}
+	query += ` ORDER BY last_name,first_name`
+	rows, err := h.DB.QueryContext(r.Context(), query, args...)
 	if err != nil {
 		writeError(w, 500, "Datenbankfehler")
 		return
@@ -281,7 +391,8 @@ func (h *Server) GetApiV1Users(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 func (h *Server) PostApiV1Users(w http.ResponseWriter, r *http.Request) {
-	if !requireRole(w, h.claims(w, r), "admin") {
+	c := h.claims(w, r)
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin) {
 		return
 	}
 	var req api.CreateUserRequest
@@ -292,6 +403,27 @@ func (h *Server) PostApiV1Users(w http.ResponseWriter, r *http.Request) {
 	if err := validateCreateUser(req); err != nil {
 		writeError(w, 400, err.Error())
 		return
+	}
+	// Role/school policy: superadmin may create any role (school_id optional,
+	// NULL = platform admin). school_admin may only create teachers of the own
+	// school - school_id always comes from the caller's profile.
+	targetRole := string(req.Role)
+	if isSuperadmin(c.Role) {
+		if targetRole == RoleSuperadmin && req.SchoolId != nil {
+			writeError(w, 400, "Superadmins gehören zu keiner Schule")
+			return
+		}
+	} else {
+		if targetRole != RoleTeacher {
+			writeError(w, 403, "Schul-Admins dürfen nur Lehrkräfte anlegen")
+			return
+		}
+		own, ok := h.ownSchoolID(r)
+		if !ok {
+			writeError(w, 403, "keine Schule zugeordnet")
+			return
+		}
+		req.SchoolId = &own
 	}
 	tx, err := h.DB.BeginTx(r.Context(), nil)
 	if err != nil {
@@ -316,7 +448,8 @@ func (h *Server) PostApiV1Users(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Server) PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request) {
-	if !requireRole(w, h.claims(w, r), "admin") {
+	c := h.claims(w, r)
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin) {
 		return
 	}
 	var req api.BulkCreateUsersRequest
@@ -333,6 +466,10 @@ func (h *Server) PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, err.Error())
 			return
 		}
+		if !isSuperadmin(c.Role) && string(user.Role) != RoleTeacher {
+			writeError(w, 403, "Schul-Admins dürfen nur Lehrkräfte anlegen")
+			return
+		}
 	}
 	tx, err := h.DB.BeginTx(r.Context(), nil)
 	if err != nil {
@@ -340,8 +477,21 @@ func (h *Server) PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	var ownSchool int
+	var hasOwn bool
+	if !isSuperadmin(c.Role) {
+		ownSchool, hasOwn = h.ownSchoolID(r)
+		if !hasOwn {
+			writeError(w, 403, "keine Schule zugeordnet")
+			return
+		}
+	}
 	users := make([]api.User, 0, len(req.Users))
 	for _, user := range req.Users {
+		if hasOwn {
+			s := ownSchool
+			user.SchoolId = &s
+		}
 		created, err := createUser(r.Context(), tx, user)
 		if err != nil {
 			if isDuplicate(err) {
@@ -379,7 +529,14 @@ func validateCreateUser(req api.CreateUserRequest) error {
 }
 
 func validRole(role string) bool {
-	return role == "student" || role == "teacher" || role == "admin"
+	return role == RoleStudent || role == RoleTeacher || role == RoleSchoolAdmin || role == RoleSuperadmin || role == "admin"
+}
+
+func nullableSchoolID(v *int) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }
 
 func createUser(ctx context.Context, tx *sql.Tx, req api.CreateUserRequest) (api.User, error) {
@@ -388,7 +545,7 @@ func createUser(ctx context.Context, tx *sql.Tx, req api.CreateUserRequest) (api
 		return api.User{}, err
 	}
 	email := strings.ToLower(strings.TrimSpace(string(req.Email)))
-	return scanUser(tx.QueryRowContext(ctx, `INSERT INTO users(email,password_hash,first_name,last_name,role) VALUES($1,$2,$3,$4,$5) RETURNING id,email,first_name,last_name,role`, email, string(hash), strings.TrimSpace(req.FirstName), strings.TrimSpace(req.LastName), string(req.Role)))
+	return scanUser(tx.QueryRowContext(ctx, `INSERT INTO users(email,password_hash,first_name,last_name,role,school_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,email,first_name,last_name,role,school_id`, email, string(hash), strings.TrimSpace(req.FirstName), strings.TrimSpace(req.LastName), string(req.Role), nullableSchoolID(req.SchoolId)))
 }
 
 func isDuplicate(err error) bool {
@@ -399,11 +556,11 @@ func (h *Server) GetApiV1UsersId(w http.ResponseWriter, r *http.Request, id int)
 	if c == nil {
 		return
 	}
-	if c.Role != "admin" && c.UserID != id {
+	if !isSuperadmin(c.Role) && c.UserID != id {
 		writeError(w, 403, "keine Berechtigung")
 		return
 	}
-	u, err := scanUser(h.DB.QueryRowContext(r.Context(), `SELECT id,email,first_name,last_name,role FROM users WHERE id=$1 AND active`, id))
+	u, err := scanUser(h.DB.QueryRowContext(r.Context(), userSelect+` WHERE id=$1 AND active`, id))
 	if notFound(w, err, "Benutzer") {
 		return
 	}
@@ -418,7 +575,7 @@ func (h *Server) PatchApiV1UsersId(w http.ResponseWriter, r *http.Request, id in
 	if c == nil {
 		return
 	}
-	if c.Role != "admin" && c.UserID != id {
+	if !isSuperadmin(c.Role) && c.UserID != id {
 		writeError(w, 403, "keine Berechtigung")
 		return
 	}
@@ -427,8 +584,8 @@ func (h *Server) PatchApiV1UsersId(w http.ResponseWriter, r *http.Request, id in
 		writeError(w, 400, "ungültiges JSON")
 		return
 	}
-	if c.Role != "admin" && (req.Role != nil || req.Password != nil) {
-		writeError(w, 403, "Rolle und Passwort dürfen nur von Admins geändert werden")
+	if !isSuperadmin(c.Role) && (req.Role != nil || req.Password != nil) {
+		writeError(w, 403, "Rolle und Passwort dürfen nur vom Superadmin geändert werden")
 		return
 	}
 	if req.Role != nil && !validRole(string(*req.Role)) {
@@ -449,7 +606,7 @@ func (h *Server) PatchApiV1UsersId(w http.ResponseWriter, r *http.Request, id in
 		value := string(hash)
 		passwordHash = &value
 	}
-	u, err := scanUser(h.DB.QueryRowContext(r.Context(), `UPDATE users SET first_name=COALESCE($1,first_name),last_name=COALESCE($2,last_name),role=COALESCE($3,role),password_hash=COALESCE($4,password_hash),updated_at=NOW() WHERE id=$5 AND active RETURNING id,email,first_name,last_name,role`, req.FirstName, req.LastName, req.Role, passwordHash, id))
+	u, err := scanUser(h.DB.QueryRowContext(r.Context(), `UPDATE users SET first_name=COALESCE($1,first_name),last_name=COALESCE($2,last_name),role=COALESCE($3,role),password_hash=COALESCE($4,password_hash),updated_at=NOW() WHERE id=$5 AND active RETURNING id,email,first_name,last_name,role,school_id`, req.FirstName, req.LastName, req.Role, passwordHash, id))
 	if notFound(w, err, "Benutzer") {
 		return
 	}
@@ -461,12 +618,34 @@ func (h *Server) PatchApiV1UsersId(w http.ResponseWriter, r *http.Request, id in
 }
 func (h *Server) DeleteApiV1UsersId(w http.ResponseWriter, r *http.Request, id int) {
 	c := h.claims(w, r)
-	if !requireRole(w, c, "admin") {
+	if !requireRole(w, c, RoleSuperadmin, RoleSchoolAdmin) {
 		return
 	}
 	if c.UserID == id {
 		writeError(w, 400, "eigenes Konto kann nicht gelöscht werden")
 		return
+	}
+	if !isSuperadmin(c.Role) {
+		// school_admin may only deactivate teachers of the own school.
+		var targetRole string
+		var targetSchool sql.NullInt64
+		if err := h.DB.QueryRowContext(r.Context(), `SELECT role, school_id FROM users WHERE id=$1 AND active`, id).Scan(&targetRole, &targetSchool); err != nil {
+			if err == sql.ErrNoRows {
+				writeError(w, 404, "Benutzer nicht gefunden")
+				return
+			}
+			writeError(w, 500, "Datenbankfehler")
+			return
+		}
+		if targetRole != RoleTeacher {
+			writeError(w, 403, "Schul-Admins dürfen nur Lehrkräfte deaktivieren")
+			return
+		}
+		own, ok := h.ownSchoolID(r)
+		if !ok || !targetSchool.Valid || int(targetSchool.Int64) != own {
+			writeError(w, 403, "kein Zugriff auf diese Schule")
+			return
+		}
 	}
 	res, err := h.DB.ExecContext(r.Context(), `UPDATE users SET active=false,updated_at=NOW() WHERE id=$1 AND active`, id)
 	if err != nil {

@@ -47,7 +47,7 @@ func (h *Server) PostApiV1Subjects(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "nicht autorisiert")
 		return
 	}
-	if claims.Role != "admin" {
+	if !isSuperadmin(claims.Role) {
 		writeError(w, http.StatusForbidden, "keine Berechtigung")
 		return
 	}

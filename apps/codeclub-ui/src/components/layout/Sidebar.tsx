@@ -54,14 +54,16 @@ const UsersIcon = () => (
 );
 
 const navItems: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: <HomeIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/substitutions", label: "Vertretungsplan", icon: <SwapIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/calendar", label: "Kalender", icon: <CalendarIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/files", label: "Dateien", icon: <FolderIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/homework", label: "Hausaufgaben", icon: <BookIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/chat", label: "Chat", icon: <ChatIcon />, roles: ["student", "teacher", "admin"] },
-  { to: "/admin/users", label: "Benutzer", icon: <UsersIcon />, roles: ["admin"] },
-  { to: "/admin/classes", label: "Klassen", icon: <UsersIcon />, roles: ["admin", "teacher"] },
+  { to: "/dashboard", label: "Dashboard", icon: <HomeIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/substitutions", label: "Vertretungsplan", icon: <SwapIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/calendar", label: "Kalender", icon: <CalendarIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/files", label: "Dateien", icon: <FolderIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/homework", label: "Hausaufgaben", icon: <BookIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/chat", label: "Chat", icon: <ChatIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/join", label: "Klasse beitreten", icon: <UsersIcon />, roles: ["student"] },
+  { to: "/admin/users", label: "Benutzer", icon: <UsersIcon />, roles: ["superadmin", "admin", "school_admin"] },
+  { to: "/admin/classes", label: "Klassen", icon: <UsersIcon />, roles: ["superadmin", "admin", "school_admin", "teacher"] },
+  { to: "/admin/schools", label: "Schulen", icon: <UsersIcon />, roles: ["superadmin", "admin"] },
 ];
 
 export function Sidebar() {
@@ -123,7 +125,7 @@ export function Sidebar() {
               {user?.first_name} {user?.last_name}
             </p>
             <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-              {user?.role === "student" ? "Schüler" : user?.role === "teacher" ? "Lehrer" : "Admin"}
+              {user?.role === "student" ? "Schüler" : user?.role === "teacher" ? "Lehrer" : user?.role === "school_admin" ? "Schul-Admin" : "Superadmin"}
             </p>
           </div>
           <button

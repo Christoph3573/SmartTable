@@ -10,11 +10,12 @@ const currentSchoolYear = "2026/27";
 export function ClassesPage() {
   const client = useQueryClient();
   const role = useAuthStore((state) => state.user?.role);
-  const isAdmin = role === "admin";
+  const canCreate = role === "superadmin" || role === "admin" || role === "school_admin" || role === "teacher";
+  const canManage = role === "superadmin" || role === "admin" || role === "school_admin" || role === "teacher";
   const [selectedId, setSelectedId] = useState<number>();
   const [showCreate, setShowCreate] = useState(false);
   const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes });
-  const users = useQuery({ queryKey: ["users"], queryFn: schoolApi.users, enabled: isAdmin });
+  const users = useQuery({ queryKey: ["users"], queryFn: schoolApi.users, enabled: canManage });
   const create = useMutation({
     mutationFn: schoolApi.createClass,
     onSuccess: (schoolClass) => {
@@ -36,7 +37,7 @@ export function ClassesPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Klassenverwaltung</h1>
           <p className="mt-2 text-sm text-gray-500">Klassen einstellen, Lehrkräfte zuweisen und Schüler:innen verwalten.</p>
         </div>
-        {isAdmin && <Button onClick={() => setShowCreate(true)}>Klasse anlegen</Button>}
+        {canCreate && <Button onClick={() => setShowCreate(true)}>Klasse anlegen</Button>}
       </div>
 
       {showCreate && (
@@ -67,14 +68,14 @@ export function ClassesPage() {
               ))}
             </div>
           </aside>
-          {selected && <ClassSettings key={selected.id} schoolClass={selected} users={users.data ?? []} canManageMembers={isAdmin} />}
+          {selected && <ClassSettings key={selected.id} schoolClass={selected} users={users.data ?? []} canManageMembers={canManage} showRequests={canManage} />}
         </div>
       )}
     </div>
   );
 }
 
-function ClassSettings({ schoolClass, users, canManageMembers }: { schoolClass: SchoolClass; users: Awaited<ReturnType<typeof schoolApi.users>>; canManageMembers: boolean }) {
+function ClassSettings({ schoolClass, users, canManageMembers, showRequests }: { schoolClass: SchoolClass; users: Awaited<ReturnType<typeof schoolApi.users>>; canManageMembers: boolean; showRequests: boolean }) {
   const client = useQueryClient();
   const [name, setName] = useState(schoolClass.name);
   const [schoolYear, setSchoolYear] = useState(schoolClass.school_year);
@@ -95,6 +96,7 @@ function ClassSettings({ schoolClass, users, canManageMembers }: { schoolClass: 
 
   return (
     <section className="space-y-6">
+      {showRequests && <JoinRequestPanel classId={schoolClass.id} />}
       <div className="rounded-xl border border-gray-200 bg-white p-5">
         <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-semibold text-gray-900">Klasse einstellen</h2><p className="mt-1 text-sm text-gray-500">Bezeichnung und Schuljahr werden direkt übernommen.</p></div></div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -149,4 +151,44 @@ function AssignmentPanel({ title, description, empty, entries, options, value, o
 function ClassCreateForm({ onSubmit, onCancel, pending, error }: { onSubmit: (data: Pick<SchoolClass, "name" | "school_year">) => void; onCancel: () => void; pending: boolean; error: boolean }) {
   const [name, setName] = useState(""); const [schoolYear, setSchoolYear] = useState(currentSchoolYear);
   return <form className="mb-6 grid gap-4 rounded-xl border border-indigo-200 bg-indigo-50 p-5 md:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); onSubmit({ name, school_year: schoolYear }); }}><label className="text-sm font-medium text-gray-700">Klasse<input className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required placeholder="z. B. 7a" value={name} onChange={(event) => setName(event.target.value)} /></label><label className="text-sm font-medium text-gray-700">Schuljahr<input className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required value={schoolYear} onChange={(event) => setSchoolYear(event.target.value)} /></label><div className="flex items-end gap-2"><Button type="button" variant="ghost" onClick={onCancel}>Abbrechen</Button><Button loading={pending}>Anlegen</Button></div>{error && <p className="text-sm text-red-600 md:col-span-3">Die Klasse konnte nicht angelegt werden.</p>}</form>;
+}
+
+function JoinRequestPanel({ classId }: { classId: number }) {
+  const client = useQueryClient();
+  const requests = useQuery({ queryKey: ["join-requests", classId], queryFn: () => schoolApi.joinRequests(classId) });
+  const refresh = () => {
+    client.invalidateQueries({ queryKey: ["join-requests", classId] });
+    client.invalidateQueries({ queryKey: ["class-members", classId] });
+  };
+  const approve = useMutation({ mutationFn: schoolApi.approveJoinRequest, onSuccess: refresh });
+  const reject = useMutation({ mutationFn: schoolApi.rejectJoinRequest, onSuccess: refresh });
+
+  if (requests.isLoading) return <div className="rounded-xl border border-gray-200 bg-white p-5"><LoadingState label="Anfragen werden geladen" /></div>;
+  if (requests.isError) return null;
+  if (!requests.data?.length) return null;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50">
+      <div className="border-b border-amber-200 px-5 py-4">
+        <h2 className="font-semibold text-gray-900">Beitrittsanfragen ({requests.data.length})</h2>
+        <p className="mt-1 text-sm text-gray-500">Schüler:innen warten auf Freigabe für diese Klasse.</p>
+      </div>
+      <div>
+        {requests.data.map((req) => (
+          <div className="flex items-center gap-3 border-b border-amber-100 bg-white px-5 py-3 last:border-0" key={req.id}>
+            <div className="grid size-8 place-items-center rounded-full bg-amber-100 text-xs font-semibold text-amber-800">
+              {(req.student_first_name?.[0] ?? "?")}{(req.student_last_name?.[0] ?? "")}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-gray-900">{req.student_first_name} {req.student_last_name}</p>
+              <p className="truncate text-xs text-gray-500">{req.student_email}</p>
+            </div>
+            <button className="text-sm font-medium text-indigo-700 hover:underline disabled:opacity-50" disabled={approve.isPending || reject.isPending} onClick={() => approve.mutate(req.id)}>Freigeben</button>
+            <button className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50" disabled={approve.isPending || reject.isPending} onClick={() => reject.mutate(req.id)}>Ablehnen</button>
+          </div>
+        ))}
+      </div>
+      {(approve.isError || reject.isError) && <p className="bg-white px-5 py-3 text-sm text-red-600">Die Entscheidung konnte nicht gespeichert werden.</p>}
+    </div>
+  );
 }

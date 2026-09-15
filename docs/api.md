@@ -6,17 +6,38 @@
 POST  /login      E-Mail + Passwort → Access + Refresh Token
 POST  /refresh    Refresh Token → neues Access Token
 POST  /logout     Refresh Token invalidieren
+POST  /register   Öffentliche Schüler-Registrierung (school_id + optional requested_class_id → 201 + ggf. Beitrittsanfrage)
 GET   /me         Eigenes Profil
 PATCH /me         Eigenes Profil aktualisieren
 ```
 
-## Benutzer `/api/v1/users` (Admin)
+## Öffentlich (ohne Auth, für Registrierung)
 
 ```
-GET    /          Alle Benutzer
+GET /public/schools            Schulen auflisten
+GET /public/classes?school_id= Klassen einer Schule auflisten
+```
+
+## Schulen `/api/v1/schools`
+
+```
+GET  /    Schulen (superadmin: alle; Personal: eigene)
+POST /    Schule anlegen (nur superadmin)
+```
+
+## Zugehörigkeit
+
+```
+GET /me/membership   { school, classes[], pending[] } für Banner/Join-Flow
+```
+
+## Benutzer `/api/v1/users` (superadmin: alle Rollen; school_admin: nur teacher eigener Schule)
+
+```
+GET    /          Alle Benutzer (Scope: eigene Schule für Schul-Admins)
 POST   /          Benutzer erstellen
 POST   /bulk       Bis zu 200 Benutzer atomar erstellen
-PATCH  /:id       Benutzer bearbeiten
+PATCH  /:id       Benutzer bearbeiten (nur superadmin ändert Rolle/Passwort)
 DELETE /:id       Benutzer deaktivieren
 ```
 
@@ -29,16 +50,25 @@ im selben Arbeitsschritt einer ausgewählten Klasse zuordnen.
 ## Klassen `/api/v1/classes`
 
 ```
-GET    /                      Klassen (eigene für Schüler/Lehrer)
-POST   /                      Klasse erstellen (Admin)
-PATCH  /:id                   Klassenname und Schuljahr ändern (Admin)
-DELETE /:id                   Klasse löschen (Admin)
+GET    /                      Klassen (Schüler/Lehrer: eigene; school_admin: eigene Schule; superadmin: alle)
+POST   /                      Klasse erstellen (superadmin|school_admin|teacher; school_id aus Profil)
+PATCH  /:id                   Klassenname und Schuljahr ändern (Klassenverwaltung)
+DELETE /:id                   Klasse löschen (superadmin|school_admin eigener Schule)
 GET    /:id/members            Schüler der Klasse auflisten
 POST   /:id/members           Schüler hinzufügen
 DELETE /:id/members/:uid      Schüler entfernen
 GET    /:id/teachers           Lehrkräfte der Klasse auflisten
-POST   /:id/teachers          Lehrer zuweisen
+POST   /:id/teachers          Lehrer zuweisen (superadmin|school_admin)
 DELETE /:id/teachers/:uid     Lehrkraft entfernen
+```
+
+## Beitrittsanfragen
+
+```
+POST /classes/:id/join-requests  Anfrage stellen (Schüler der Klassenschule, idempotent)
+GET  /classes/:id/join-requests  Offene Anfragen (Lehrer eigener Klasse, school_admin eigener Schule)
+POST /join-requests/:id/approve  Freigeben (Transaktion → class_members)
+POST /join-requests/:id/reject   Ablehnen
 ```
 
 ## Vertretungsplan `/api/v1/substitutions`

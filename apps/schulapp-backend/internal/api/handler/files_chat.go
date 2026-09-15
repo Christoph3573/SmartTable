@@ -371,7 +371,7 @@ func (h *Server) GetApiV1ChatContacts(w http.ResponseWriter, r *http.Request) {
 	query := `SELECT u.id,u.email,u.first_name,u.last_name,u.role
 		FROM users u
 		WHERE u.active AND u.id <> $1`
-	if c.Role != "admin" {
+	if !isSuperadmin(c.Role) {
 		query += ` AND EXISTS (
 			SELECT 1
 			FROM (
@@ -418,7 +418,7 @@ func (h *Server) canChatWith(r *http.Request, targetID int) bool {
 	err := h.DB.QueryRowContext(r.Context(), `SELECT EXISTS(
 		SELECT 1 FROM users u
 		WHERE u.id=$2 AND u.active AND (
-			$3='admin' OR EXISTS (
+			$3='superadmin' OR $3='admin' OR EXISTS (
 				SELECT 1 FROM (
 					SELECT class_id FROM class_members WHERE user_id=$1
 					UNION SELECT class_id FROM class_teachers WHERE user_id=$1

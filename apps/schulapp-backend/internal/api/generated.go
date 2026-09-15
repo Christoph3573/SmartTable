@@ -44,17 +44,20 @@ func (e ChatChannelType) Valid() bool {
 
 // Defines values for ChatContactRole.
 const (
-	ChatContactRoleAdmin   ChatContactRole = "admin"
-	ChatContactRoleStudent ChatContactRole = "student"
-	ChatContactRoleTeacher ChatContactRole = "teacher"
+	ChatContactRoleSchoolAdmin ChatContactRole = "school_admin"
+	ChatContactRoleStudent     ChatContactRole = "student"
+	ChatContactRoleSuperadmin  ChatContactRole = "superadmin"
+	ChatContactRoleTeacher     ChatContactRole = "teacher"
 )
 
 // Valid indicates whether the value is a known member of the ChatContactRole enum.
 func (e ChatContactRole) Valid() bool {
 	switch e {
-	case ChatContactRoleAdmin:
+	case ChatContactRoleSchoolAdmin:
 		return true
 	case ChatContactRoleStudent:
+		return true
+	case ChatContactRoleSuperadmin:
 		return true
 	case ChatContactRoleTeacher:
 		return true
@@ -65,17 +68,20 @@ func (e ChatContactRole) Valid() bool {
 
 // Defines values for ClassMemberRole.
 const (
-	ClassMemberRoleAdmin   ClassMemberRole = "admin"
-	ClassMemberRoleStudent ClassMemberRole = "student"
-	ClassMemberRoleTeacher ClassMemberRole = "teacher"
+	ClassMemberRoleSchoolAdmin ClassMemberRole = "school_admin"
+	ClassMemberRoleStudent     ClassMemberRole = "student"
+	ClassMemberRoleSuperadmin  ClassMemberRole = "superadmin"
+	ClassMemberRoleTeacher     ClassMemberRole = "teacher"
 )
 
 // Valid indicates whether the value is a known member of the ClassMemberRole enum.
 func (e ClassMemberRole) Valid() bool {
 	switch e {
-	case ClassMemberRoleAdmin:
+	case ClassMemberRoleSchoolAdmin:
 		return true
 	case ClassMemberRoleStudent:
+		return true
+	case ClassMemberRoleSuperadmin:
 		return true
 	case ClassMemberRoleTeacher:
 		return true
@@ -155,17 +161,20 @@ func (e CreateSubstitutionRequestType) Valid() bool {
 
 // Defines values for CreateUserRequestRole.
 const (
-	CreateUserRequestRoleAdmin   CreateUserRequestRole = "admin"
-	CreateUserRequestRoleStudent CreateUserRequestRole = "student"
-	CreateUserRequestRoleTeacher CreateUserRequestRole = "teacher"
+	CreateUserRequestRoleSchoolAdmin CreateUserRequestRole = "school_admin"
+	CreateUserRequestRoleStudent     CreateUserRequestRole = "student"
+	CreateUserRequestRoleSuperadmin  CreateUserRequestRole = "superadmin"
+	CreateUserRequestRoleTeacher     CreateUserRequestRole = "teacher"
 )
 
 // Valid indicates whether the value is a known member of the CreateUserRequestRole enum.
 func (e CreateUserRequestRole) Valid() bool {
 	switch e {
-	case CreateUserRequestRoleAdmin:
+	case CreateUserRequestRoleSchoolAdmin:
 		return true
 	case CreateUserRequestRoleStudent:
+		return true
+	case CreateUserRequestRoleSuperadmin:
 		return true
 	case CreateUserRequestRoleTeacher:
 		return true
@@ -213,6 +222,27 @@ func (e HomeworkSubmissionStatus) Valid() bool {
 	case Open:
 		return true
 	case Submitted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for JoinRequestStatus.
+const (
+	Approved JoinRequestStatus = "approved"
+	Pending  JoinRequestStatus = "pending"
+	Rejected JoinRequestStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the JoinRequestStatus enum.
+func (e JoinRequestStatus) Valid() bool {
+	switch e {
+	case Approved:
+		return true
+	case Pending:
+		return true
+	case Rejected:
 		return true
 	default:
 		return false
@@ -293,17 +323,20 @@ func (e UpdateSubstitutionRequestType) Valid() bool {
 
 // Defines values for UpdateUserRequestRole.
 const (
-	UpdateUserRequestRoleAdmin   UpdateUserRequestRole = "admin"
-	UpdateUserRequestRoleStudent UpdateUserRequestRole = "student"
-	UpdateUserRequestRoleTeacher UpdateUserRequestRole = "teacher"
+	UpdateUserRequestRoleSchoolAdmin UpdateUserRequestRole = "school_admin"
+	UpdateUserRequestRoleStudent     UpdateUserRequestRole = "student"
+	UpdateUserRequestRoleSuperadmin  UpdateUserRequestRole = "superadmin"
+	UpdateUserRequestRoleTeacher     UpdateUserRequestRole = "teacher"
 )
 
 // Valid indicates whether the value is a known member of the UpdateUserRequestRole enum.
 func (e UpdateUserRequestRole) Valid() bool {
 	switch e {
-	case UpdateUserRequestRoleAdmin:
+	case UpdateUserRequestRoleSchoolAdmin:
 		return true
 	case UpdateUserRequestRoleStudent:
+		return true
+	case UpdateUserRequestRoleSuperadmin:
 		return true
 	case UpdateUserRequestRoleTeacher:
 		return true
@@ -314,17 +347,20 @@ func (e UpdateUserRequestRole) Valid() bool {
 
 // Defines values for UserRole.
 const (
-	UserRoleAdmin   UserRole = "admin"
-	UserRoleStudent UserRole = "student"
-	UserRoleTeacher UserRole = "teacher"
+	UserRoleSchoolAdmin UserRole = "school_admin"
+	UserRoleStudent     UserRole = "student"
+	UserRoleSuperadmin  UserRole = "superadmin"
+	UserRoleTeacher     UserRole = "teacher"
 )
 
 // Valid indicates whether the value is a known member of the UserRole enum.
 func (e UserRole) Valid() bool {
 	switch e {
-	case UserRoleAdmin:
+	case UserRoleSchoolAdmin:
 		return true
 	case UserRoleStudent:
+		return true
+	case UserRoleSuperadmin:
 		return true
 	case UserRoleTeacher:
 		return true
@@ -384,6 +420,7 @@ type Class struct {
 	CreatedAt  *time.Time `json:"created_at,omitempty"`
 	Id         int        `json:"id"`
 	Name       string     `json:"name"`
+	SchoolId   *int       `json:"school_id,omitempty"`
 	SchoolYear string     `json:"school_year"`
 }
 
@@ -452,6 +489,11 @@ type CreateHomeworkRequest struct {
 	Title       string             `json:"title"`
 }
 
+// CreateSchoolRequest defines model for CreateSchoolRequest.
+type CreateSchoolRequest struct {
+	Name string `json:"name"`
+}
+
 // CreateSubjectRequest defines model for CreateSubjectRequest.
 type CreateSubjectRequest struct {
 	Name  string `json:"name"`
@@ -481,6 +523,7 @@ type CreateUserRequest struct {
 	LastName  string                `json:"last_name"`
 	Password  string                `json:"password"`
 	Role      CreateUserRequestRole `json:"role"`
+	SchoolId  *int                  `json:"school_id,omitempty"`
 }
 
 // CreateUserRequestRole defines model for CreateUserRequest.Role.
@@ -560,6 +603,23 @@ type HomeworkSubmission struct {
 // HomeworkSubmissionStatus defines model for HomeworkSubmission.Status.
 type HomeworkSubmissionStatus string
 
+// JoinRequest defines model for JoinRequest.
+type JoinRequest struct {
+	ClassId          int               `json:"class_id"`
+	CreatedAt        *time.Time        `json:"created_at,omitempty"`
+	DecidedAt        *time.Time        `json:"decided_at,omitempty"`
+	DecidedBy        *int              `json:"decided_by,omitempty"`
+	Id               int               `json:"id"`
+	Status           JoinRequestStatus `json:"status"`
+	StudentEmail     *string           `json:"student_email,omitempty"`
+	StudentFirstName *string           `json:"student_first_name,omitempty"`
+	StudentId        int               `json:"student_id"`
+	StudentLastName  *string           `json:"student_last_name,omitempty"`
+}
+
+// JoinRequestStatus defines model for JoinRequest.Status.
+type JoinRequestStatus string
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    openapi_types.Email `json:"email"`
@@ -570,6 +630,13 @@ type LoginRequest struct {
 type LoginResponse struct {
 	AccessToken string `json:"access_token"`
 	User        User   `json:"user"`
+}
+
+// Membership defines model for Membership.
+type Membership struct {
+	Classes []Class       `json:"classes"`
+	Pending []JoinRequest `json:"pending"`
+	School  *School       `json:"school,omitempty"`
 }
 
 // Message defines model for Message.
@@ -585,6 +652,23 @@ type Message struct {
 // RefreshResponse defines model for RefreshResponse.
 type RefreshResponse struct {
 	AccessToken string `json:"access_token"`
+}
+
+// RegisterRequest defines model for RegisterRequest.
+type RegisterRequest struct {
+	Email            openapi_types.Email `json:"email"`
+	FirstName        string              `json:"first_name"`
+	LastName         string              `json:"last_name"`
+	Password         string              `json:"password"`
+	RequestedClassId *int                `json:"requested_class_id,omitempty"`
+	SchoolId         int                 `json:"school_id"`
+}
+
+// School defines model for School.
+type School struct {
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+	Id        int        `json:"id"`
+	Name      string     `json:"name"`
 }
 
 // SendMessageRequest defines model for SendMessageRequest.
@@ -679,6 +763,7 @@ type User struct {
 	Id        int                 `json:"id"`
 	LastName  string              `json:"last_name"`
 	Role      UserRole            `json:"role"`
+	SchoolId  *int                `json:"school_id,omitempty"`
 }
 
 // UserRole defines model for User.Role.
@@ -714,6 +799,11 @@ type PostApiV1HomeworkIdSubmissionsMultipartBody struct {
 	File *openapi_types.File `json:"file,omitempty"`
 }
 
+// GetApiV1PublicClassesParams defines parameters for GetApiV1PublicClasses.
+type GetApiV1PublicClassesParams struct {
+	SchoolId int `form:"school_id" json:"school_id"`
+}
+
 // GetApiV1SubstitutionsParams defines parameters for GetApiV1Substitutions.
 type GetApiV1SubstitutionsParams struct {
 	DateFrom *openapi_types.Date `form:"date_from,omitempty" json:"date_from,omitempty"`
@@ -726,6 +816,9 @@ type PostApiV1AuthLoginJSONRequestBody = LoginRequest
 
 // PatchApiV1AuthMeJSONRequestBody defines body for PatchApiV1AuthMe for application/json ContentType.
 type PatchApiV1AuthMeJSONRequestBody = UpdateUserRequest
+
+// PostApiV1AuthRegisterJSONRequestBody defines body for PostApiV1AuthRegister for application/json ContentType.
+type PostApiV1AuthRegisterJSONRequestBody = RegisterRequest
 
 // PostApiV1ChannelsJSONRequestBody defines body for PostApiV1Channels for application/json ContentType.
 type PostApiV1ChannelsJSONRequestBody = CreateChannelRequest
@@ -766,6 +859,9 @@ type PatchApiV1HomeworkIdJSONRequestBody = UpdateHomeworkRequest
 // PostApiV1HomeworkIdSubmissionsMultipartRequestBody defines body for PostApiV1HomeworkIdSubmissions for multipart/form-data ContentType.
 type PostApiV1HomeworkIdSubmissionsMultipartRequestBody PostApiV1HomeworkIdSubmissionsMultipartBody
 
+// PostApiV1SchoolsJSONRequestBody defines body for PostApiV1Schools for application/json ContentType.
+type PostApiV1SchoolsJSONRequestBody = CreateSchoolRequest
+
 // PostApiV1SubjectsJSONRequestBody defines body for PostApiV1Subjects for application/json ContentType.
 type PostApiV1SubjectsJSONRequestBody = CreateSubjectRequest
 
@@ -804,6 +900,9 @@ type ServerInterface interface {
 	// PostApiV1AuthRefresh Access Token erneuern
 	// (POST /api/v1/auth/refresh)
 	PostApiV1AuthRefresh(w http.ResponseWriter, r *http.Request)
+	// PostApiV1AuthRegister Öffentliche Schüler-Registrierung (legt Konto an + optional Beitrittsanfrage)
+	// (POST /api/v1/auth/register)
+	PostApiV1AuthRegister(w http.ResponseWriter, r *http.Request)
 	// GetApiV1Channels Meine Chat-Channels auflisten
 	// (GET /api/v1/channels)
 	GetApiV1Channels(w http.ResponseWriter, r *http.Request)
@@ -852,6 +951,12 @@ type ServerInterface interface {
 	// PostApiV1ClassesIdHomework Hausaufgabe anlegen
 	// (POST /api/v1/classes/{id}/homework)
 	PostApiV1ClassesIdHomework(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1ClassesIdJoinRequests Beitrittsanfragen einer Klasse auflisten
+	// (GET /api/v1/classes/{id}/join-requests)
+	GetApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *http.Request, id int)
+	// PostApiV1ClassesIdJoinRequests Beitrittsanfrage stellen (Schüler)
+	// (POST /api/v1/classes/{id}/join-requests)
+	PostApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *http.Request, id int)
 	// GetApiV1ClassesIdMembers Klassenmitglieder auflisten
 	// (GET /api/v1/classes/{id}/members)
 	GetApiV1ClassesIdMembers(w http.ResponseWriter, r *http.Request, id int)
@@ -906,6 +1011,27 @@ type ServerInterface interface {
 	// PostApiV1HomeworkIdSubmissions Hausaufgabe abgeben
 	// (POST /api/v1/homework/{id}/submissions)
 	PostApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *http.Request, id int)
+	// PostApiV1JoinRequestsIdApprove Beitrittsanfrage freigeben
+	// (POST /api/v1/join-requests/{id}/approve)
+	PostApiV1JoinRequestsIdApprove(w http.ResponseWriter, r *http.Request, id int)
+	// PostApiV1JoinRequestsIdReject Beitrittsanfrage ablehnen
+	// (POST /api/v1/join-requests/{id}/reject)
+	PostApiV1JoinRequestsIdReject(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1MeMembership Eigene Schul-Zugehörigkeit (Schule, Klassen, offene Anfragen)
+	// (GET /api/v1/me/membership)
+	GetApiV1MeMembership(w http.ResponseWriter, r *http.Request)
+	// GetApiV1PublicClasses Klassen einer Schule öffentlich auflisten (für Registrierung)
+	// (GET /api/v1/public/classes)
+	GetApiV1PublicClasses(w http.ResponseWriter, r *http.Request, params GetApiV1PublicClassesParams)
+	// GetApiV1PublicSchools Schulen öffentlich auflisten (für Registrierung)
+	// (GET /api/v1/public/schools)
+	GetApiV1PublicSchools(w http.ResponseWriter, r *http.Request)
+	// GetApiV1Schools Schulen auflisten
+	// (GET /api/v1/schools)
+	GetApiV1Schools(w http.ResponseWriter, r *http.Request)
+	// PostApiV1Schools Schule anlegen (nur superadmin)
+	// (POST /api/v1/schools)
+	PostApiV1Schools(w http.ResponseWriter, r *http.Request)
 	// GetApiV1Subjects Schulfächer auflisten
 	// (GET /api/v1/subjects)
 	GetApiV1Subjects(w http.ResponseWriter, r *http.Request)
@@ -981,6 +1107,12 @@ func (_ Unimplemented) PatchApiV1AuthMe(w http.ResponseWriter, r *http.Request) 
 // PostApiV1AuthRefresh Access Token erneuern
 // (POST /api/v1/auth/refresh)
 func (_ Unimplemented) PostApiV1AuthRefresh(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1AuthRegister Öffentliche Schüler-Registrierung (legt Konto an + optional Beitrittsanfrage)
+// (POST /api/v1/auth/register)
+func (_ Unimplemented) PostApiV1AuthRegister(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1077,6 +1209,18 @@ func (_ Unimplemented) GetApiV1ClassesIdHomework(w http.ResponseWriter, r *http.
 // PostApiV1ClassesIdHomework Hausaufgabe anlegen
 // (POST /api/v1/classes/{id}/homework)
 func (_ Unimplemented) PostApiV1ClassesIdHomework(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1ClassesIdJoinRequests Beitrittsanfragen einer Klasse auflisten
+// (GET /api/v1/classes/{id}/join-requests)
+func (_ Unimplemented) GetApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1ClassesIdJoinRequests Beitrittsanfrage stellen (Schüler)
+// (POST /api/v1/classes/{id}/join-requests)
+func (_ Unimplemented) PostApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *http.Request, id int) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1185,6 +1329,48 @@ func (_ Unimplemented) GetApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *h
 // PostApiV1HomeworkIdSubmissions Hausaufgabe abgeben
 // (POST /api/v1/homework/{id}/submissions)
 func (_ Unimplemented) PostApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1JoinRequestsIdApprove Beitrittsanfrage freigeben
+// (POST /api/v1/join-requests/{id}/approve)
+func (_ Unimplemented) PostApiV1JoinRequestsIdApprove(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1JoinRequestsIdReject Beitrittsanfrage ablehnen
+// (POST /api/v1/join-requests/{id}/reject)
+func (_ Unimplemented) PostApiV1JoinRequestsIdReject(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1MeMembership Eigene Schul-Zugehörigkeit (Schule, Klassen, offene Anfragen)
+// (GET /api/v1/me/membership)
+func (_ Unimplemented) GetApiV1MeMembership(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1PublicClasses Klassen einer Schule öffentlich auflisten (für Registrierung)
+// (GET /api/v1/public/classes)
+func (_ Unimplemented) GetApiV1PublicClasses(w http.ResponseWriter, r *http.Request, params GetApiV1PublicClassesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1PublicSchools Schulen öffentlich auflisten (für Registrierung)
+// (GET /api/v1/public/schools)
+func (_ Unimplemented) GetApiV1PublicSchools(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1Schools Schulen auflisten
+// (GET /api/v1/schools)
+func (_ Unimplemented) GetApiV1Schools(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1Schools Schule anlegen (nur superadmin)
+// (POST /api/v1/schools)
+func (_ Unimplemented) PostApiV1Schools(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1342,6 +1528,20 @@ func (siw *ServerInterfaceWrapper) PostApiV1AuthRefresh(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostApiV1AuthRefresh(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1AuthRegister operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1AuthRegister(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1AuthRegister(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1743,6 +1943,58 @@ func (siw *ServerInterfaceWrapper) PostApiV1ClassesIdHomework(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostApiV1ClassesIdHomework(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1ClassesIdJoinRequests operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ClassesIdJoinRequests(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1ClassesIdJoinRequests operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1ClassesIdJoinRequests(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2247,6 +2499,147 @@ func (siw *ServerInterfaceWrapper) PostApiV1HomeworkIdSubmissions(w http.Respons
 	handler.ServeHTTP(w, r)
 }
 
+// PostApiV1JoinRequestsIdApprove operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1JoinRequestsIdApprove(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1JoinRequestsIdApprove(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1JoinRequestsIdReject operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1JoinRequestsIdReject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1JoinRequestsIdReject(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1MeMembership operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1MeMembership(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1MeMembership(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1PublicClasses operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1PublicClasses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetApiV1PublicClassesParams
+
+	// ------------- Required query parameter "school_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "school_id", r.URL.Query(), &params.SchoolId, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "school_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "school_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1PublicClasses(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1PublicSchools operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1PublicSchools(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1PublicSchools(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1Schools operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1Schools(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1Schools(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1Schools operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1Schools(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1Schools(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetApiV1Subjects operation middleware
 func (siw *ServerInterfaceWrapper) GetApiV1Subjects(w http.ResponseWriter, r *http.Request) {
 
@@ -2695,6 +3088,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/auth/logout", wrapper.PostApiV1AuthLogout)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/auth/register", wrapper.PostApiV1AuthRegister)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/public/schools", wrapper.GetApiV1PublicSchools)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/public/classes", wrapper.GetApiV1PublicClasses)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/schools", wrapper.GetApiV1Schools)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/schools", wrapper.PostApiV1Schools)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/me/membership", wrapper.GetApiV1MeMembership)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/auth/me", wrapper.GetApiV1AuthMe)
 	})
 	r.Group(func(r chi.Router) {
@@ -2741,6 +3152,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/classes/{id}/members/{userId}", wrapper.DeleteApiV1ClassesIdMembersUserId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/classes/{id}/join-requests", wrapper.GetApiV1ClassesIdJoinRequests)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/classes/{id}/join-requests", wrapper.PostApiV1ClassesIdJoinRequests)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/join-requests/{id}/approve", wrapper.PostApiV1JoinRequestsIdApprove)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/join-requests/{id}/reject", wrapper.PostApiV1JoinRequestsIdReject)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/classes/{id}/teachers", wrapper.GetApiV1ClassesIdTeachers)
@@ -2853,64 +3276,74 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"krAEkZwJefb16utVfPP25j8BAAD//w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

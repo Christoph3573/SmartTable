@@ -78,7 +78,8 @@ func main() {
 		protected := appmw.Auth(jwtSecret)(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.URL.Path == "/health" || req.URL.Path == "/api/v1/health" || req.URL.Path == "/ws" ||
-				req.URL.Path == "/api/v1/auth/login" || req.URL.Path == "/api/v1/auth/refresh" || req.URL.Path == "/api/v1/auth/logout" {
+				req.URL.Path == "/api/v1/auth/login" || req.URL.Path == "/api/v1/auth/refresh" || req.URL.Path == "/api/v1/auth/logout" ||
+				req.URL.Path == "/api/v1/auth/register" || req.URL.Path == "/api/v1/public/schools" || req.URL.Path == "/api/v1/public/classes" {
 				next.ServeHTTP(w, req)
 				return
 			}
@@ -92,9 +93,10 @@ func main() {
 	})
 
 	srv := &handler.Server{
-		DB:           db,
-		JWTSecret:    jwtSecret,
-		LoginLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5),
+		DB:              db,
+		JWTSecret:       jwtSecret,
+		LoginLimiter:    rate.NewLimiter(rate.Every(time.Minute/5), 5),
+		RegisterLimiter: rate.NewLimiter(rate.Every(time.Minute), 10),
 		// UPLOAD_DIR is the deployed Compose setting. FILE_STORAGE_PATH remains a
 		// backwards-compatible local override.
 		UploadDir: envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
@@ -145,9 +147,9 @@ func seedAdminUser(db *sql.DB) {
 		 VALUES ($1, $2, $3, $4, $5, true)
 		 ON CONFLICT (email) DO UPDATE SET
 		   password_hash = EXCLUDED.password_hash,
-		   role = 'admin',
+		   role = 'superadmin',
 		   active = true`,
-		"admin@schule.de", string(hash), "Admin", "Schule", "admin",
+		"admin@schule.de", string(hash), "Admin", "Schule", "superadmin",
 	)
 	if err != nil {
 		log.Printf("seed: Fehler beim Anlegen/Updaten des Admin-Users: %v", err)
