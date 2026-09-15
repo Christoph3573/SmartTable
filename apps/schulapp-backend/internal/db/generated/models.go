@@ -28,6 +28,17 @@ type Class struct {
 	Name       string
 	SchoolYear string
 	CreatedAt  time.Time
+	SchoolID   int32
+}
+
+type ClassJoinRequest struct {
+	ID        int32
+	ClassID   int32
+	StudentID int32
+	Status    string
+	DecidedBy sql.NullInt32
+	CreatedAt time.Time
+	DecidedAt sql.NullTime
 }
 
 type ClassMember struct {
@@ -92,6 +103,18 @@ type HomeworkSubmission struct {
 	Grade       sql.NullString
 	SubmittedAt sql.NullTime
 	GradedAt    sql.NullTime
+	FileID      sql.NullInt32
+}
+
+type Lesson struct {
+	ID        int32
+	ClassID   int32
+	SubjectID int32
+	TeacherID int32
+	DayOfWeek int32
+	Period    int32
+	Room      sql.NullString
+	CreatedAt time.Time
 }
 
 type Message struct {
@@ -108,6 +131,12 @@ type RefreshToken struct {
 	UserID    int32
 	Token     string
 	ExpiresAt time.Time
+	CreatedAt time.Time
+}
+
+type School struct {
+	ID        int32
+	Name      string
 	CreatedAt time.Time
 }
 
@@ -141,4 +170,5 @@ type User struct {
 	Active       bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	SchoolID     sql.NullInt32
 }

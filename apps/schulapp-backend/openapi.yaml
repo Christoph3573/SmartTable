@@ -301,6 +301,84 @@ components:
         note:
           type: string
 
+    Lesson:
+      type: object
+      required: [id, class_id, subject_id, teacher_id, day_of_week, period]
+      properties:
+        id:
+          type: integer
+        class_id:
+          type: integer
+        subject_id:
+          type: integer
+        teacher_id:
+          type: integer
+        day_of_week:
+          type: integer
+          description: "1=Montag..5=Freitag"
+          minimum: 1
+          maximum: 5
+        period:
+          type: integer
+        room:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CreateLessonRequest:
+      type: object
+      required: [subject_id, teacher_id, day_of_week, period]
+      properties:
+        subject_id:
+          type: integer
+        teacher_id:
+          type: integer
+        day_of_week:
+          type: integer
+          minimum: 1
+          maximum: 5
+        period:
+          type: integer
+        room:
+          type: string
+
+    UpdateLessonRequest:
+      type: object
+      properties:
+        subject_id:
+          type: integer
+        teacher_id:
+          type: integer
+        day_of_week:
+          type: integer
+          minimum: 1
+          maximum: 5
+        period:
+          type: integer
+        room:
+          type: string
+
+    # Ein Stundenplan-Slot für eine konkrete Kalenderwoche: die wiederkehrende
+    # Lesson, ggf. überlagert von einer Vertretung derselben Woche (gleiches
+    # class_id+date+period). type erlaubt der UI, ohne Zusatzlogik zwischen
+    # normalem, vertretenem und ausgefallenem Unterricht zu unterscheiden.
+    TimetableEntry:
+      type: object
+      required: [lesson, date, type]
+      properties:
+        lesson:
+          $ref: "#/components/schemas/Lesson"
+        date:
+          type: string
+          format: date
+          description: Datum dieses Lesson-Slots in der angefragten Woche
+        substitution:
+          $ref: "#/components/schemas/Substitution"
+        type:
+          type: string
+          enum: [regular, substituted, cancelled]
+
     Event:
       type: object
       required: [id, title, start_time, end_time, type]
@@ -1320,6 +1398,98 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Homework"
+
+  /api/v1/classes/{id}/lessons:
+    get:
+      tags: [lessons]
+      summary: Stundenplan einer Klasse auflisten (recurring Lessons, optional mit Vertretungen einer Woche überlagert)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: week_of
+          in: query
+          description: "Beliebiges Datum innerhalb der gewünschten Woche (YYYY-MM-DD). Lessons werden für diese Kalenderwoche auf Daten projiziert und mit Substitutions derselben Klasse+Datum+Stunde zusammengeführt. Ohne Angabe wird die aktuelle Woche verwendet."
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Stundenplan der Woche, Lessons überlagert mit Substitutions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimetableEntry"
+    post:
+      tags: [lessons]
+      summary: Stundenplan-Slot anlegen (teacher der eigenen Klasse, school_admin/superadmin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLessonRequest"
+      responses:
+        "201":
+          description: Stundenplan-Slot angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
+
+  /api/v1/lessons/{id}:
+    patch:
+      tags: [lessons]
+      summary: Stundenplan-Slot aktualisieren
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLessonRequest"
+      responses:
+        "200":
+          description: Aktualisierter Stundenplan-Slot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
+    delete:
+      tags: [lessons]
+      summary: Stundenplan-Slot löschen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Stundenplan-Slot gelöscht
 
   /api/v1/homework/{id}:
     patch:

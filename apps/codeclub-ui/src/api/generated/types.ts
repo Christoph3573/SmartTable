@@ -1164,6 +1164,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/classes/{id}/lessons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stundenplan einer Klasse auflisten (recurring Lessons, optional mit Vertretungen einer Woche überlagert) */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Beliebiges Datum innerhalb der gewünschten Woche (YYYY-MM-DD). Lessons werden für diese Kalenderwoche auf Daten projiziert und mit Substitutions derselben Klasse+Datum+Stunde zusammengeführt. Ohne Angabe wird die aktuelle Woche verwendet. */
+                    week_of?: string;
+                };
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Stundenplan der Woche, Lessons überlagert mit Substitutions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TimetableEntry"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Stundenplan-Slot anlegen (teacher der eigenen Klasse, school_admin/superadmin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateLessonRequest"];
+                };
+            };
+            responses: {
+                /** @description Stundenplan-Slot angelegt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Lesson"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lessons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stundenplan-Slot löschen */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Stundenplan-Slot gelöscht */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Stundenplan-Slot aktualisieren */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateLessonRequest"];
+                };
+            };
+            responses: {
+                /** @description Aktualisierter Stundenplan-Slot */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Lesson"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/v1/homework/{id}": {
         parameters: {
             query?: never;
@@ -2237,6 +2366,43 @@ export interface components {
             /** @enum {string} */
             type?: "substitution" | "cancellation" | "room_change" | "extra";
             note?: string;
+        };
+        Lesson: {
+            id: number;
+            class_id: number;
+            subject_id: number;
+            teacher_id: number;
+            /** @description 1=Montag..5=Freitag */
+            day_of_week: number;
+            period: number;
+            room?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        CreateLessonRequest: {
+            subject_id: number;
+            teacher_id: number;
+            day_of_week: number;
+            period: number;
+            room?: string;
+        };
+        UpdateLessonRequest: {
+            subject_id?: number;
+            teacher_id?: number;
+            day_of_week?: number;
+            period?: number;
+            room?: string;
+        };
+        TimetableEntry: {
+            lesson: components["schemas"]["Lesson"];
+            /**
+             * Format: date
+             * @description Datum dieses Lesson-Slots in der angefragten Woche
+             */
+            date: string;
+            substitution?: components["schemas"]["Substitution"];
+            /** @enum {string} */
+            type: "regular" | "substituted" | "cancelled";
         };
         Event: {
             id: number;

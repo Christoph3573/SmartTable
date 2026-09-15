@@ -29,6 +29,10 @@ export type HomeworkInput = components["schemas"]["CreateHomeworkRequest"];
 export type UpdateHomeworkInput = components["schemas"]["UpdateHomeworkRequest"];
 export type SubstitutionInput = components["schemas"]["CreateSubstitutionRequest"];
 export type UpdateSubstitutionInput = components["schemas"]["UpdateSubstitutionRequest"];
+export type Lesson = components["schemas"]["Lesson"];
+export type LessonInput = components["schemas"]["CreateLessonRequest"];
+export type UpdateLessonInput = components["schemas"]["UpdateLessonRequest"];
+export type TimetableEntry = components["schemas"]["TimetableEntry"];
 
 export const schoolApi = {
   users: () => apiClient.get<SchoolUser[]>("/api/v1/users").then((r) => r.data),
@@ -92,6 +96,14 @@ export const schoolApi = {
   updateSubstitution: (id: number, data: UpdateSubstitutionInput) =>
     apiClient.patch<Substitution>(`/api/v1/substitutions/${id}`, data).then((r) => r.data),
   deleteSubstitution: (id: number) => apiClient.delete(`/api/v1/substitutions/${id}`),
+
+  timetable: (classId: number, weekOf?: string) =>
+    apiClient.get<TimetableEntry[]>(`/api/v1/classes/${classId}/lessons`, { params: weekOf ? { week_of: weekOf } : undefined }).then((r) => r.data),
+  createLesson: (classId: number, data: LessonInput) =>
+    apiClient.post<Lesson>(`/api/v1/classes/${classId}/lessons`, data).then((r) => r.data),
+  updateLesson: (id: number, data: UpdateLessonInput) =>
+    apiClient.patch<Lesson>(`/api/v1/lessons/${id}`, data).then((r) => r.data),
+  deleteLesson: (id: number) => apiClient.delete(`/api/v1/lessons/${id}`),
 
   events: (params?: { start_date?: string; end_date?: string; class_id?: number }) =>
     apiClient.get<CalendarEvent[]>("/api/v1/events", { params }).then((r) => r.data),

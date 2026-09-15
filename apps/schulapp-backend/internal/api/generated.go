@@ -273,6 +273,27 @@ func (e SubstitutionType) Valid() bool {
 	}
 }
 
+// Defines values for TimetableEntryType.
+const (
+	Cancelled   TimetableEntryType = "cancelled"
+	Regular     TimetableEntryType = "regular"
+	Substituted TimetableEntryType = "substituted"
+)
+
+// Valid indicates whether the value is a known member of the TimetableEntryType enum.
+func (e TimetableEntryType) Valid() bool {
+	switch e {
+	case Cancelled:
+		return true
+	case Regular:
+		return true
+	case Substituted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateEventRequestType.
 const (
 	UpdateEventRequestTypeEvent   UpdateEventRequestType = "event"
@@ -489,6 +510,15 @@ type CreateHomeworkRequest struct {
 	Title       string             `json:"title"`
 }
 
+// CreateLessonRequest defines model for CreateLessonRequest.
+type CreateLessonRequest struct {
+	DayOfWeek int     `json:"day_of_week"`
+	Period    int     `json:"period"`
+	Room      *string `json:"room,omitempty"`
+	SubjectId int     `json:"subject_id"`
+	TeacherId int     `json:"teacher_id"`
+}
+
 // CreateSchoolRequest defines model for CreateSchoolRequest.
 type CreateSchoolRequest struct {
 	Name string `json:"name"`
@@ -620,6 +650,20 @@ type JoinRequest struct {
 // JoinRequestStatus defines model for JoinRequest.Status.
 type JoinRequestStatus string
 
+// Lesson defines model for Lesson.
+type Lesson struct {
+	ClassId   int        `json:"class_id"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// DayOfWeek 1=Montag..5=Freitag
+	DayOfWeek int     `json:"day_of_week"`
+	Id        int     `json:"id"`
+	Period    int     `json:"period"`
+	Room      *string `json:"room,omitempty"`
+	SubjectId int     `json:"subject_id"`
+	TeacherId int     `json:"teacher_id"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    openapi_types.Email `json:"email"`
@@ -702,6 +746,18 @@ type Substitution struct {
 // SubstitutionType defines model for Substitution.Type.
 type SubstitutionType string
 
+// TimetableEntry defines model for TimetableEntry.
+type TimetableEntry struct {
+	// Date Datum dieses Lesson-Slots in der angefragten Woche
+	Date         openapi_types.Date `json:"date"`
+	Lesson       Lesson             `json:"lesson"`
+	Substitution *Substitution      `json:"substitution,omitempty"`
+	Type         TimetableEntryType `json:"type"`
+}
+
+// TimetableEntryType defines model for TimetableEntry.Type.
+type TimetableEntryType string
+
 // UpdateClassRequest defines model for UpdateClassRequest.
 type UpdateClassRequest struct {
 	Name       *string `json:"name,omitempty"`
@@ -727,6 +783,15 @@ type UpdateHomeworkRequest struct {
 	DueDate     *openapi_types.Date `json:"due_date,omitempty"`
 	SubjectId   *int                `json:"subject_id,omitempty"`
 	Title       *string             `json:"title,omitempty"`
+}
+
+// UpdateLessonRequest defines model for UpdateLessonRequest.
+type UpdateLessonRequest struct {
+	DayOfWeek *int    `json:"day_of_week,omitempty"`
+	Period    *int    `json:"period,omitempty"`
+	Room      *string `json:"room,omitempty"`
+	SubjectId *int    `json:"subject_id,omitempty"`
+	TeacherId *int    `json:"teacher_id,omitempty"`
 }
 
 // UpdateSubstitutionRequest defines model for UpdateSubstitutionRequest.
@@ -787,6 +852,12 @@ type PostApiV1ClassesIdFilesMultipartBody struct {
 	FolderId *int               `json:"folder_id,omitempty"`
 }
 
+// GetApiV1ClassesIdLessonsParams defines parameters for GetApiV1ClassesIdLessons.
+type GetApiV1ClassesIdLessonsParams struct {
+	// WeekOf Beliebiges Datum innerhalb der gewünschten Woche (YYYY-MM-DD). Lessons werden für diese Kalenderwoche auf Daten projiziert und mit Substitutions derselben Klasse+Datum+Stunde zusammengeführt. Ohne Angabe wird die aktuelle Woche verwendet.
+	WeekOf *openapi_types.Date `form:"week_of,omitempty" json:"week_of,omitempty"`
+}
+
 // GetApiV1EventsParams defines parameters for GetApiV1Events.
 type GetApiV1EventsParams struct {
 	StartDate *openapi_types.Date `form:"start_date,omitempty" json:"start_date,omitempty"`
@@ -841,6 +912,9 @@ type PostApiV1ClassesIdFoldersJSONRequestBody = CreateFolderRequest
 // PostApiV1ClassesIdHomeworkJSONRequestBody defines body for PostApiV1ClassesIdHomework for application/json ContentType.
 type PostApiV1ClassesIdHomeworkJSONRequestBody = CreateHomeworkRequest
 
+// PostApiV1ClassesIdLessonsJSONRequestBody defines body for PostApiV1ClassesIdLessons for application/json ContentType.
+type PostApiV1ClassesIdLessonsJSONRequestBody = CreateLessonRequest
+
 // PostApiV1ClassesIdMembersJSONRequestBody defines body for PostApiV1ClassesIdMembers for application/json ContentType.
 type PostApiV1ClassesIdMembersJSONRequestBody = AddMemberRequest
 
@@ -858,6 +932,9 @@ type PatchApiV1HomeworkIdJSONRequestBody = UpdateHomeworkRequest
 
 // PostApiV1HomeworkIdSubmissionsMultipartRequestBody defines body for PostApiV1HomeworkIdSubmissions for multipart/form-data ContentType.
 type PostApiV1HomeworkIdSubmissionsMultipartRequestBody PostApiV1HomeworkIdSubmissionsMultipartBody
+
+// PatchApiV1LessonsIdJSONRequestBody defines body for PatchApiV1LessonsId for application/json ContentType.
+type PatchApiV1LessonsIdJSONRequestBody = UpdateLessonRequest
 
 // PostApiV1SchoolsJSONRequestBody defines body for PostApiV1Schools for application/json ContentType.
 type PostApiV1SchoolsJSONRequestBody = CreateSchoolRequest
@@ -957,6 +1034,12 @@ type ServerInterface interface {
 	// PostApiV1ClassesIdJoinRequests Beitrittsanfrage stellen (Schüler)
 	// (POST /api/v1/classes/{id}/join-requests)
 	PostApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1ClassesIdLessons Stundenplan einer Klasse auflisten (recurring Lessons, optional mit Vertretungen einer Woche überlagert)
+	// (GET /api/v1/classes/{id}/lessons)
+	GetApiV1ClassesIdLessons(w http.ResponseWriter, r *http.Request, id int, params GetApiV1ClassesIdLessonsParams)
+	// PostApiV1ClassesIdLessons Stundenplan-Slot anlegen (teacher der eigenen Klasse, school_admin/superadmin)
+	// (POST /api/v1/classes/{id}/lessons)
+	PostApiV1ClassesIdLessons(w http.ResponseWriter, r *http.Request, id int)
 	// GetApiV1ClassesIdMembers Klassenmitglieder auflisten
 	// (GET /api/v1/classes/{id}/members)
 	GetApiV1ClassesIdMembers(w http.ResponseWriter, r *http.Request, id int)
@@ -1017,6 +1100,12 @@ type ServerInterface interface {
 	// PostApiV1JoinRequestsIdReject Beitrittsanfrage ablehnen
 	// (POST /api/v1/join-requests/{id}/reject)
 	PostApiV1JoinRequestsIdReject(w http.ResponseWriter, r *http.Request, id int)
+	// DeleteApiV1LessonsId Stundenplan-Slot löschen
+	// (DELETE /api/v1/lessons/{id})
+	DeleteApiV1LessonsId(w http.ResponseWriter, r *http.Request, id int)
+	// PatchApiV1LessonsId Stundenplan-Slot aktualisieren
+	// (PATCH /api/v1/lessons/{id})
+	PatchApiV1LessonsId(w http.ResponseWriter, r *http.Request, id int)
 	// GetApiV1MeMembership Eigene Schul-Zugehörigkeit (Schule, Klassen, offene Anfragen)
 	// (GET /api/v1/me/membership)
 	GetApiV1MeMembership(w http.ResponseWriter, r *http.Request)
@@ -1224,6 +1313,18 @@ func (_ Unimplemented) PostApiV1ClassesIdJoinRequests(w http.ResponseWriter, r *
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetApiV1ClassesIdLessons Stundenplan einer Klasse auflisten (recurring Lessons, optional mit Vertretungen einer Woche überlagert)
+// (GET /api/v1/classes/{id}/lessons)
+func (_ Unimplemented) GetApiV1ClassesIdLessons(w http.ResponseWriter, r *http.Request, id int, params GetApiV1ClassesIdLessonsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1ClassesIdLessons Stundenplan-Slot anlegen (teacher der eigenen Klasse, school_admin/superadmin)
+// (POST /api/v1/classes/{id}/lessons)
+func (_ Unimplemented) PostApiV1ClassesIdLessons(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetApiV1ClassesIdMembers Klassenmitglieder auflisten
 // (GET /api/v1/classes/{id}/members)
 func (_ Unimplemented) GetApiV1ClassesIdMembers(w http.ResponseWriter, r *http.Request, id int) {
@@ -1341,6 +1442,18 @@ func (_ Unimplemented) PostApiV1JoinRequestsIdApprove(w http.ResponseWriter, r *
 // PostApiV1JoinRequestsIdReject Beitrittsanfrage ablehnen
 // (POST /api/v1/join-requests/{id}/reject)
 func (_ Unimplemented) PostApiV1JoinRequestsIdReject(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteApiV1LessonsId Stundenplan-Slot löschen
+// (DELETE /api/v1/lessons/{id})
+func (_ Unimplemented) DeleteApiV1LessonsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PatchApiV1LessonsId Stundenplan-Slot aktualisieren
+// (PATCH /api/v1/lessons/{id})
+func (_ Unimplemented) PatchApiV1LessonsId(w http.ResponseWriter, r *http.Request, id int) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2004,6 +2117,74 @@ func (siw *ServerInterfaceWrapper) PostApiV1ClassesIdJoinRequests(w http.Respons
 	handler.ServeHTTP(w, r)
 }
 
+// GetApiV1ClassesIdLessons operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ClassesIdLessons(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetApiV1ClassesIdLessonsParams
+
+	// ------------- Optional query parameter "week_of" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "week_of", r.URL.Query(), &params.WeekOf, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "week_of"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "week_of", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ClassesIdLessons(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1ClassesIdLessons operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1ClassesIdLessons(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1ClassesIdLessons(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetApiV1ClassesIdMembers operation middleware
 func (siw *ServerInterfaceWrapper) GetApiV1ClassesIdMembers(w http.ResponseWriter, r *http.Request) {
 
@@ -2542,6 +2723,58 @@ func (siw *ServerInterfaceWrapper) PostApiV1JoinRequestsIdReject(w http.Response
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostApiV1JoinRequestsIdReject(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteApiV1LessonsId operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1LessonsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiV1LessonsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchApiV1LessonsId operation middleware
+func (siw *ServerInterfaceWrapper) PatchApiV1LessonsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchApiV1LessonsId(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3181,6 +3414,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/classes/{id}/homework", wrapper.PostApiV1ClassesIdHomework)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/classes/{id}/lessons", wrapper.GetApiV1ClassesIdLessons)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/classes/{id}/lessons", wrapper.PostApiV1ClassesIdLessons)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/lessons/{id}", wrapper.DeleteApiV1LessonsId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/api/v1/lessons/{id}", wrapper.PatchApiV1LessonsId)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/homework/{id}", wrapper.DeleteApiV1HomeworkId)
 	})
 	r.Group(func(r chi.Router) {
@@ -3276,74 +3521,84 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

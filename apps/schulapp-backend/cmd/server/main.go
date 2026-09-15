@@ -95,8 +95,8 @@ func main() {
 	srv := &handler.Server{
 		DB:              db,
 		JWTSecret:       jwtSecret,
-		LoginLimiter:    rate.NewLimiter(rate.Every(time.Minute/5), 5),
-		RegisterLimiter: rate.NewLimiter(rate.Every(time.Minute), 10),
+		LoginLimiter:    handler.NewIPRateLimiter(rate.Every(time.Minute/5), 5),
+		RegisterLimiter: handler.NewIPRateLimiter(rate.Every(time.Minute), 10),
 		// UPLOAD_DIR is the deployed Compose setting. FILE_STORAGE_PATH remains a
 		// backwards-compatible local override.
 		UploadDir: envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),

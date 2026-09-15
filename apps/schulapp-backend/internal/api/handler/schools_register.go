@@ -65,7 +65,7 @@ func (h *Server) GetApiV1PublicClasses(w http.ResponseWriter, r *http.Request, p
 // Always returns a generic 201 on success and never leaks which emails exist:
 // duplicate emails yield 409 without further detail.
 func (h *Server) PostApiV1AuthRegister(w http.ResponseWriter, r *http.Request) {
-	if h.RegisterLimiter != nil && !h.RegisterLimiter.Allow() {
+	if h.RegisterLimiter != nil && !h.RegisterLimiter.Allow(r) {
 		writeError(w, http.StatusTooManyRequests, "zu viele Anfragen")
 		return
 	}

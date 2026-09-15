@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 const AddClassMember = `-- name: AddClassMember :exec
@@ -53,9 +54,16 @@ type CreateClassParams struct {
 	SchoolYear string
 }
 
-func (q *Queries) CreateClass(ctx context.Context, arg CreateClassParams) (Class, error) {
+type CreateClassRow struct {
+	ID         int32
+	Name       string
+	SchoolYear string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) CreateClass(ctx context.Context, arg CreateClassParams) (CreateClassRow, error) {
 	row := q.db.QueryRowContext(ctx, CreateClass, arg.Name, arg.SchoolYear)
-	var i Class
+	var i CreateClassRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -80,9 +88,16 @@ FROM classes
 WHERE id = $1
 `
 
-func (q *Queries) GetClassByID(ctx context.Context, id int32) (Class, error) {
+type GetClassByIDRow struct {
+	ID         int32
+	Name       string
+	SchoolYear string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) GetClassByID(ctx context.Context, id int32) (GetClassByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, GetClassByID, id)
-	var i Class
+	var i GetClassByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -188,15 +203,22 @@ FROM classes
 ORDER BY name
 `
 
-func (q *Queries) ListClasses(ctx context.Context) ([]Class, error) {
+type ListClassesRow struct {
+	ID         int32
+	Name       string
+	SchoolYear string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) ListClasses(ctx context.Context) ([]ListClassesRow, error) {
 	rows, err := q.db.QueryContext(ctx, ListClasses)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Class
+	var items []ListClassesRow
 	for rows.Next() {
-		var i Class
+		var i ListClassesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -260,9 +282,16 @@ type UpdateClassParams struct {
 	ID      int32
 }
 
-func (q *Queries) UpdateClass(ctx context.Context, arg UpdateClassParams) (Class, error) {
+type UpdateClassRow struct {
+	ID         int32
+	Name       string
+	SchoolYear string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) UpdateClass(ctx context.Context, arg UpdateClassParams) (UpdateClassRow, error) {
 	row := q.db.QueryRowContext(ctx, UpdateClass, arg.Column1, arg.Column2, arg.ID)
-	var i Class
+	var i UpdateClassRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,

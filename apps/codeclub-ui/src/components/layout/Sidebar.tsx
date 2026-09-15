@@ -56,6 +56,7 @@ const UsersIcon = () => (
 
 const navItems: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: <HomeIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/timetable", label: "Stundenplan", icon: <CalendarIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
   { to: "/substitutions", label: "Vertretungsplan", icon: <SwapIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
   { to: "/calendar", label: "Kalender", icon: <CalendarIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
   { to: "/files", label: "Dateien", icon: <FolderIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },

@@ -10,6 +10,7 @@ import { SubstitutionsPage } from "../pages/substitutions/SubstitutionsPage";
 import { CalendarPage } from "../pages/calendar/CalendarPage";
 import { FilesPage } from "../pages/files/FilesPage";
 import { HomeworkPage } from "../pages/homework/HomeworkPage";
+import { TimetablePage } from "../pages/timetable/TimetablePage";
 import { ChatPage } from "../pages/chat/ChatPage";
 import { UsersPage } from "../pages/admin/UsersPage";
 import { ClassesPage } from "../pages/admin/ClassesPage";
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { path: "/dashboard", element: <DashboardPage /> },
+          { path: "/timetable", element: <TimetablePage /> },
           { path: "/substitutions", element: <SubstitutionsPage /> },
           { path: "/calendar", element: <CalendarPage /> },
           { path: "/files", element: <FilesPage /> },

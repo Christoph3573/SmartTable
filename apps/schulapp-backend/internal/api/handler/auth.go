@@ -18,7 +18,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/time/rate"
 )
 
 type Server struct {
@@ -26,14 +25,14 @@ type Server struct {
 
 	DB               *sql.DB
 	JWTSecret        []byte
-	LoginLimiter     *rate.Limiter
-	RegisterLimiter  *rate.Limiter
+	LoginLimiter     *IPRateLimiter
+	RegisterLimiter  *IPRateLimiter
 	UploadDir        string
 	Hub              *ws.Hub
 }
 
 func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
-	if !h.LoginLimiter.Allow() {
+	if !h.LoginLimiter.Allow(r) {
 		writeError(w, http.StatusTooManyRequests, "zu viele Anfragen")
 		return
 	}

@@ -78,7 +78,7 @@ const GradeSubmission = `-- name: GradeSubmission :one
 UPDATE homework_submissions
 SET grade = $1, status = 'graded', graded_at = NOW()
 WHERE id = $2
-RETURNING id, homework_id, student_id, status, grade, submitted_at, graded_at
+RETURNING id, homework_id, student_id, status, grade, submitted_at, graded_at, file_id
 `
 
 type GradeSubmissionParams struct {
@@ -97,6 +97,7 @@ func (q *Queries) GradeSubmission(ctx context.Context, arg GradeSubmissionParams
 		&i.Grade,
 		&i.SubmittedAt,
 		&i.GradedAt,
+		&i.FileID,
 	)
 	return i, err
 }
@@ -141,7 +142,7 @@ func (q *Queries) ListHomeworkByClass(ctx context.Context, classID int32) ([]Hom
 }
 
 const ListSubmissionsByHomework = `-- name: ListSubmissionsByHomework :many
-SELECT hs.id, hs.homework_id, hs.student_id, hs.status, hs.grade, hs.submitted_at, hs.graded_at
+SELECT hs.id, hs.homework_id, hs.student_id, hs.status, hs.grade, hs.submitted_at, hs.graded_at, hs.file_id
 FROM homework_submissions hs
 WHERE hs.homework_id = $1
 ORDER BY hs.student_id
@@ -164,6 +165,7 @@ func (q *Queries) ListSubmissionsByHomework(ctx context.Context, homeworkID int3
 			&i.Grade,
 			&i.SubmittedAt,
 			&i.GradedAt,
+			&i.FileID,
 		); err != nil {
 			return nil, err
 		}
