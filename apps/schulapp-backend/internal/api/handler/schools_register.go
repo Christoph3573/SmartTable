@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -132,16 +133,19 @@ func (h *Server) PostApiV1AuthRegister(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 409, "E-Mail bereits vergeben")
 			return
 		}
+		log.Printf("register: user insert failed (email=%s school_id=%d): %v", email, req.SchoolId, err)
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}
 	if classID > 0 {
 		if _, err := tx.ExecContext(r.Context(), `INSERT INTO class_join_requests(class_id,student_id) VALUES($1,$2) ON CONFLICT(class_id,student_id) DO NOTHING`, classID, u.Id); err != nil {
+			log.Printf("register: join_request insert failed (user_id=%d class_id=%d): %v", u.Id, classID, err)
 			writeError(w, 500, "Datenbankfehler")
 			return
 		}
 	}
 	if err := tx.Commit(); err != nil {
+		log.Printf("register: tx commit failed (email=%s): %v", email, err)
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}

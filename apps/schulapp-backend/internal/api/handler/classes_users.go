@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -437,10 +438,12 @@ func (h *Server) PostApiV1Users(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 409, "E-Mail bereits vergeben")
 			return
 		}
+		log.Printf("createUser: insert failed (email=%s role=%s): %v", req.Email, req.Role, err)
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}
 	if err = tx.Commit(); err != nil {
+		log.Printf("createUser: tx commit failed (email=%s): %v", req.Email, err)
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}
@@ -498,12 +501,14 @@ func (h *Server) PostApiV1UsersBulk(w http.ResponseWriter, r *http.Request) {
 				writeError(w, 409, "mindestens eine E-Mail ist bereits vergeben")
 				return
 			}
+			log.Printf("createUserBulk: insert failed (email=%s role=%s): %v", user.Email, user.Role, err)
 			writeError(w, 500, "Datenbankfehler")
 			return
 		}
 		users = append(users, created)
 	}
 	if err = tx.Commit(); err != nil {
+		log.Printf("createUserBulk: tx commit failed: %v", err)
 		writeError(w, 500, "Datenbankfehler")
 		return
 	}

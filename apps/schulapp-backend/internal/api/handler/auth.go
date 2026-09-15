@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"schulapp/internal/api"
@@ -42,6 +44,11 @@ func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Register/CreateUser speichern E-Mails kleingeschrieben+getrimmt;
+	// der Login muss dieselbe Normalisierung anwenden, sonst findet
+	// "Max@Schule.de" den als "max@schule.de" gespeicherten User nicht.
+	email := strings.ToLower(strings.TrimSpace(string(req.Email)))
+
 	var passwordHash string
 	var user api.User
 	var schoolID sql.NullInt64
@@ -49,7 +56,7 @@ func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
 	err := h.DB.QueryRowContext(r.Context(),
 		`SELECT password_hash, id, email, first_name, last_name, role, school_id
 		 FROM users WHERE email = $1 AND active = true`,
-		req.Email,
+		email,
 	).Scan(&passwordHash, &user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Role, &schoolID)
 	if schoolID.Valid {
 		x := int(schoolID.Int64)
@@ -88,6 +95,7 @@ func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
 		user.Id, refreshTokenHash(refreshToken), expiresAt,
 	)
 	if err != nil {
+		log.Printf("login: refresh_token insert failed (user_id=%d): %v", user.Id, err)
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
 		return
 	}
