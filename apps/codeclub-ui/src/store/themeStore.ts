@@ -1,18 +1,32 @@
 import { create } from "zustand";
 
-type Theme = "light" | "dark";
+export type Theme = "light" | "dark";
+export type ThemeMode = "light" | "dark" | "system";
 
 const STORAGE_KEY = "smarttable-theme";
 
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
+function getStoredMode(): ThemeMode | null {
+  if (typeof window === "undefined") return null;
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark") return stored;
+    if (stored === "light" || stored === "dark" || stored === "system") return stored;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function systemTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  try {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   } catch {
     return "light";
   }
+}
+
+function resolveTheme(mode: ThemeMode): Theme {
+  return mode === "system" ? systemTheme() : mode;
 }
 
 function applyTheme(theme: Theme) {
@@ -22,25 +36,32 @@ function applyTheme(theme: Theme) {
 }
 
 type ThemeState = {
+  /** Aufgelöstes, tatsächlich angewendetes Theme (für Styles/Toggle). */
   theme: Theme;
+  /** Gewählter Modus — "system" folgt dem Betriebssystem live. */
+  mode: ThemeMode;
   init: () => void;
+  setMode: (mode: ThemeMode) => void;
+  /** Explizite Wahl (light/dark) — entspricht setMode mit demselben Wert. */
   setTheme: (theme: Theme) => void;
   toggle: () => void;
 };
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  theme: getInitialTheme(),
+  theme: resolveTheme(getStoredMode() ?? "system"),
+  mode: getStoredMode() ?? "system",
 
   init: () => {
-    const theme = getInitialTheme();
+    const mode = getStoredMode() ?? "system";
+    const theme = resolveTheme(mode);
     applyTheme(theme);
-    set({ theme });
+    set({ theme, mode });
 
-    // Systemwechsel live übernehmen, solange der User nichts manuell gewählt hat
+    // Systemwechsel live übernehmen, solange "system" gewählt ist.
     try {
       const media = window.matchMedia("(prefers-color-scheme: dark)");
       const onChange = (event: MediaQueryListEvent) => {
-        if (window.localStorage.getItem(STORAGE_KEY)) return;
+        if (get().mode !== "system") return;
         const next: Theme = event.matches ? "dark" : "light";
         applyTheme(next);
         set({ theme: next });
@@ -51,17 +72,22 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     }
   },
 
-  setTheme: (theme) => {
+  setMode: (mode) => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, theme);
+      window.localStorage.setItem(STORAGE_KEY, mode);
     } catch {
       // localStorage nicht verfügbar (privater Modus) -> nur Session anwenden
     }
+    const theme = resolveTheme(mode);
     applyTheme(theme);
-    set({ theme });
+    set({ theme, mode });
+  },
+
+  setTheme: (theme) => {
+    get().setMode(theme);
   },
 
   toggle: () => {
-    get().setTheme(get().theme === "dark" ? "light" : "dark");
+    get().setMode(get().theme === "dark" ? "light" : "dark");
   },
 }));

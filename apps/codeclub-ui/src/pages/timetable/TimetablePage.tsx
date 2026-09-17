@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { schoolApi, type LessonInput, type TimetableEntry, type UpdateLessonInput } from "../../api/school";
+import { schoolConnectApi, scTimetableEntryLabel, type SchuelerportalTimetableEntry } from "../../api/schoolconnect";
 import { useAuthStore } from "../../store/authStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { Button } from "../../components/ui/Button";
 import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
 
@@ -32,16 +36,24 @@ export function TimetablePage() {
   const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(new Date()));
   const [editing, setEditing] = useState<{ dayOfWeek: number; period: number; entry?: TimetableEntry } | null>(null);
 
-  const canManage = user?.role === "teacher" || user?.role === "school_admin" || user?.role === "superadmin" || user?.role === "admin";
+  const provider = useSettingsStore((s) => s.provider);
+  const isExternal = provider === "schoolconnect";
+  const canManage = !isExternal && (user?.role === "teacher" || user?.role === "school_admin" || user?.role === "superadmin" || user?.role === "admin");
 
-  const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes });
-  const subjects = useQuery({ queryKey: ["subjects"], queryFn: schoolApi.subjects });
+  const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes, enabled: !isExternal });
+  const subjects = useQuery({ queryKey: ["subjects"], queryFn: schoolApi.subjects, enabled: !isExternal });
   const activeClassId = classId ?? classes.data?.[0]?.id;
   const weekOf = toISODate(weekAnchor);
   const timetable = useQuery({
     queryKey: ["timetable", activeClassId, weekOf],
     queryFn: () => schoolApi.timetable(activeClassId!, weekOf),
-    enabled: Boolean(activeClassId),
+    enabled: !isExternal && Boolean(activeClassId),
+  });
+  const external = useQuery({
+    queryKey: ["schoolconnect", "stundenplan"],
+    queryFn: () => schoolConnectApi.stundenplan(),
+    enabled: isExternal,
+    retry: 1,
   });
 
   const createLesson = useMutation({
@@ -63,9 +75,79 @@ export function TimetablePage() {
     return map;
   }, [timetable.data]);
 
+  const externalByCell = useMemo(() => {
+    const map = new Map<string, SchuelerportalTimetableEntry>();
+    (external.data?.eintraege ?? []).forEach((entry) =>
+      map.set(`${entry.day + 1}-${entry.stunde}`, entry)
+    );
+    return map;
+  }, [external.data]);
+
   const subjectShort = (id: number) => subjects.data?.find((s) => s.id === id)?.short ?? "?";
 
   const weekLabel = `${weekAnchor.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })} – ${new Date(weekAnchor.getTime() + 4 * 86400000).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}`;
+
+  if (isExternal) {
+    return (
+      <div className="page">
+        <PageHeader eyebrow="Wochenplan · SchoolConnect" title="Stundenplan" />
+        {external.isLoading ? (
+          <LoadingState label="Stundenplan wird geladen" />
+        ) : external.isError ? (
+          axios.isAxiosError(external.error) && external.error.response?.status === 401 ? (
+            <div className="empty-state">
+              <span aria-hidden="true">✦</span>
+              <strong>Nicht beim Schülerportal angemeldet</strong>
+              <p>Bitte in den <Link className="font-semibold text-indigo-700 hover:underline" to="/settings">Einstellungen → SchoolConnect</Link> anmelden.</p>
+              <Button size="sm" variant="secondary" onClick={() => external.refetch()}>Erneut versuchen</Button>
+            </div>
+          ) : (
+            <ErrorState onRetry={() => external.refetch()} message="Der Stundenplan konnte von SchoolConnect nicht geladen werden." />
+          )
+        ) : !external.data?.eintraege.length ? (
+          <EmptyState title="Keine Stunden gefunden" description="Das Schülerportal meldet keine Stundenplaneinträge (ggf. via Kurskürzel-Filter prüfen)." />
+        ) : (
+          <>
+            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+              Quelle: Schülerportal via SchoolConnect — schreibgeschützt, alle Kurse der Stufe (ggf. via Kurskürzel filtern).
+            </p>
+            <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <table className="w-full min-w-[720px] border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="w-16 border-b border-gray-100 bg-gray-50 px-2 py-2 text-left text-xs font-semibold text-gray-500">Std.</th>
+                    {DAYS.map((day) => (
+                      <th key={day.value} className="border-b border-gray-100 bg-gray-50 px-2 py-2 text-left text-xs font-semibold text-gray-500">{day.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {PERIODS.map((period) => (
+                    <tr key={period}>
+                      <td className="border-b border-gray-50 px-2 py-2 text-center font-mono text-xs text-gray-400">{period}.</td>
+                      {DAYS.map((day) => {
+                        const entry = externalByCell.get(`${day.value}-${period}`);
+                        if (!entry) return <td key={day.value} className="border-b border-gray-50 px-1.5 py-1.5 align-top"><div className="h-14" /></td>;
+                        const label = scTimetableEntryLabel(entry);
+                        return (
+                          <td key={day.value} className="border-b border-gray-50 px-1.5 py-1.5 align-top">
+                            <div className="flex h-14 flex-col justify-center rounded-lg border border-indigo-100 bg-indigo-50 px-2 py-1 text-xs text-indigo-800">
+                              <strong className="font-semibold">{label.subject}</strong>
+                              <span className="text-[11px] opacity-80">{label.room}</span>
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="page">

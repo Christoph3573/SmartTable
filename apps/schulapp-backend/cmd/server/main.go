@@ -99,11 +99,25 @@ func main() {
 		RegisterLimiter: handler.NewIPRateLimiter(rate.Every(time.Minute), 10),
 		// UPLOAD_DIR is the deployed Compose setting. FILE_STORAGE_PATH remains a
 		// backwards-compatible local override.
-		UploadDir: envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
-		Hub:       ws.NewHub(),
+		UploadDir:            envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
+		Hub:                  ws.NewHub(),
+		// SchoolConnect läuft auf dem Pi als systemd-Service (deploy/roles/
+		// schoolconnect); im Docker-Setup ist der Host via host-gateway
+		// erreichbar (siehe deploy docker-compose.yml.j2).
+		SchoolConnectBaseURL: envOrDefault("SCHOOLCONNECT_BASE_URL", "http://host.docker.internal:8081"),
 	}
 
 	r.Get("/ws", srv.HandleWS)
+
+	// SchoolConnect-Integration (v0.1.0-Proxy): eigenes Auth (JWT) bleibt
+	// davor — der Proxy selbst erreicht das SchoolConnect-REST via Server-Netz.
+	r.Route("/api/v1/integrations/schoolconnect", func(r chi.Router) {
+		r.Get("/status", srv.HandleSchoolConnectStatus)
+		r.Post("/{plugin}/auth", srv.HandleSchoolConnectAuth)
+		r.Post("/{plugin}/logout", srv.HandleSchoolConnectLogout)
+		r.Get("/{plugin}/{function}", srv.HandleSchoolConnectCall)
+		r.Post("/{plugin}/{function}", srv.HandleSchoolConnectCall)
+	})
 
 	api.HandlerWithOptions(srv, api.ChiServerOptions{
 		BaseRouter: r,

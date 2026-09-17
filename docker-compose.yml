@@ -39,6 +39,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       PORT: "8080"
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      # Lokal: SchoolConnect per `REST_ADDR=:8081 schoolconnect serve` auf dem
+      # Host starten — der Container erreicht ihn via host-gateway.
+      SCHOOLCONNECT_BASE_URL: ${SCHOOLCONNECT_BASE_URL:-http://host.docker.internal:8081}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       migrate:
         condition: service_completed_successfully

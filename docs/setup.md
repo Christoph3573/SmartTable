@@ -27,7 +27,26 @@ DATABASE_URL=postgres://user:pass@localhost:5432/schulapp
 JWT_SECRET=your-secret-here
 PORT=8080
 UPLOAD_DIR=./uploads
+SCHOOLCONNECT_BASE_URL=http://host.docker.internal:8081
 ```
+
+## SchoolConnect (optionaler Data-Provider)
+
+Das Backend proxied lesende Aufrufe an die SchoolConnect-REST-API v0.1.0
+(`GET /api/v1/integrations/schoolconnect/...`, siehe `docs/api.md`).
+Ohne laufendes SchoolConnect meldet `GET .../status` schlicht
+`{"reachable": false}` und die App bleibt auf dem SmartTable-Provider.
+
+```bash
+# Binary aus https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.1.0 laden, dann:
+REST_ADDR=:8081 schoolconnect serve
+# Aus Docker heraus ist der Host via host.docker.internal erreichbar
+# (SCHOOLCONNECT_BASE_URL-Default oben) — nativ via http://127.0.0.1:8081.
+```
+
+Auf den Pis installiert die Ansible-Rolle `schoolconnect` (`deploy/roles/schoolconnect/`,
+läuft in `deploy/deploy.yml` vor `schulapp_docker`) Binary + systemd-Service
+automatisch — dort ist nichts manuell zu tun.
 
 ## Frontend
 

@@ -2093,6 +2093,108 @@ paths:
               schema:
                 $ref: "#/components/schemas/Subject"
 
+  /api/v1/integrations/schoolconnect/status:
+    get:
+      tags: [integrations]
+      summary: SchoolConnect-Status (Erreichbarkeit + verfügbare Plugins)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Status mit reachable-Flag und Pluginliste
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/integrations/schoolconnect/{plugin}/auth:
+    post:
+      tags: [integrations]
+      summary: Bei einem SchoolConnect-Plugin anmelden (Credentials im Body)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: plugin
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Anmeldung erfolgreich (enthält nur Key-Namen, nie Secret-Werte)
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/integrations/schoolconnect/{plugin}/logout:
+    post:
+      tags: [integrations]
+      summary: SchoolConnect-Session eines Plugins verwerfen
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: plugin
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Abgemeldet
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/integrations/schoolconnect/{plugin}/{function}:
+    get:
+      tags: [integrations]
+      summary: Lesende SchoolConnect-Funktion aufrufen (Query-Params werden gereicht)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: plugin
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: function
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Result-Envelope {plugin, function, data}
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      tags: [integrations]
+      summary: Lesende SchoolConnect-Funktion aufrufen (JSON-Body wird gereicht)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: plugin
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: function
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Result-Envelope {plugin, function, data}
+          content:
+            application/json:
+              schema:
+                type: object
+
   /api/v1/health:
     get:
       tags: [health]

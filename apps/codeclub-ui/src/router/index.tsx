@@ -12,6 +12,7 @@ import { FilesPage } from "../pages/files/FilesPage";
 import { HomeworkPage } from "../pages/homework/HomeworkPage";
 import { TimetablePage } from "../pages/timetable/TimetablePage";
 import { ChatPage } from "../pages/chat/ChatPage";
+import { SettingsPage } from "../pages/settings/SettingsPage";
 import { UsersPage } from "../pages/admin/UsersPage";
 import { ClassesPage } from "../pages/admin/ClassesPage";
 import { SchoolsPage } from "../pages/admin/SchoolsPage";
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
           { path: "/files", element: <FilesPage /> },
           { path: "/homework", element: <HomeworkPage /> },
           { path: "/chat", element: <ChatPage /> },
+          { path: "/settings", element: <SettingsPage /> },
           {
             element: <RoleRoute allowed={["student"]} />,
             children: [

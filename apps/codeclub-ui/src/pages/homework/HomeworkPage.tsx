@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { schoolApi, type Homework, type HomeworkInput, type HomeworkSubmission, type UpdateHomeworkInput } from "../../api/school";
+import { schoolConnectApi } from "../../api/schoolconnect";
 import { useAuthStore } from "../../store/authStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { Button } from "../../components/ui/Button";
 import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
 import { formatDate } from "../../lib/format";
@@ -14,10 +18,18 @@ export function HomeworkPage() {
   const [pendingFiles, setPendingFiles] = useState<Record<number, File | undefined>>({});
   const client = useQueryClient();
   const user = useAuthStore((state) => state.user);
-  const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes });
-  const subjects = useQuery({ queryKey: ["subjects"], queryFn: schoolApi.subjects });
+  const provider = useSettingsStore((s) => s.provider);
+  const isExternal = provider === "schoolconnect";
+  const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes, enabled: !isExternal });
+  const subjects = useQuery({ queryKey: ["subjects"], queryFn: schoolApi.subjects, enabled: !isExternal });
   const activeClassId = classId ?? classes.data?.[0]?.id;
-  const homework = useQuery({ queryKey: ["homework", activeClassId], queryFn: () => schoolApi.homework(activeClassId!), enabled: Boolean(activeClassId) });
+  const homework = useQuery({ queryKey: ["homework", activeClassId], queryFn: () => schoolApi.homework(activeClassId!), enabled: !isExternal && Boolean(activeClassId) });
+  const external = useQuery({
+    queryKey: ["schoolconnect", "hausaufgaben"],
+    queryFn: schoolConnectApi.hausaufgaben,
+    enabled: isExternal,
+    retry: 1,
+  });
   const create = useMutation({ mutationFn: (data: HomeworkInput) => schoolApi.createHomework(activeClassId!, data), onSuccess: () => { client.invalidateQueries({ queryKey: ["homework", activeClassId] }); setCreateOpen(false); } });
   const update = useMutation({ mutationFn: ({ id, data }: { id: number; data: UpdateHomeworkInput }) => schoolApi.updateHomework(id, data), onSuccess: () => { client.invalidateQueries({ queryKey: ["homework", activeClassId] }); setEditing(undefined); } });
   const submit = useMutation({
@@ -39,6 +51,45 @@ export function HomeworkPage() {
   const subject = (id: number) => subjects.data?.find((entry) => entry.id === id)?.short ?? "Fach";
   const selectClass = (id: number) => setClassId(id);
 
+  if (isExternal) {
+    const aufgaben = external.data?.aufgaben ?? [];
+    return (
+      <div className="page">
+        <PageHeader eyebrow="Lernplan · SchoolConnect" title="Hausaufgaben" />
+        {external.isLoading ? <LoadingState label="Hausaufgaben werden geladen" /> : external.isError ? (
+          axios.isAxiosError(external.error) && external.error.response?.status === 401 ? (
+            <div className="empty-state">
+              <span aria-hidden="true">✦</span>
+              <strong>Nicht beim Schülerportal angemeldet</strong>
+              <p>Bitte in den <Link className="font-semibold text-indigo-700 hover:underline" to="/settings">Einstellungen → SchoolConnect</Link> anmelden.</p>
+              <Button size="sm" variant="secondary" onClick={() => external.refetch()}>Erneut versuchen</Button>
+            </div>
+          ) : (
+            <ErrorState onRetry={() => external.refetch()} message="Die Hausaufgaben konnten von SchoolConnect nicht geladen werden." />
+          )
+        ) : (
+          <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+              <span className="text-sm font-bold">{aufgaben.length} Aufgabe{aufgaben.length === 1 ? "" : "n"}</span>
+              <span className="text-xs text-gray-500">Quelle: Schülerportal via SchoolConnect — schreibgeschützt.</span>
+            </div>
+            {aufgaben.length ? aufgaben.map((item, index) => {
+              const title = field(item, "titel", "title", "fach", "subject", "uf");
+              const description = field(item, "beschreibung", "description", "text", "aufgabe");
+              const due = field(item, "faellig", "due", "datum", "date", "abgabe");
+              return (
+                <div className="data-row" key={index}>
+                  <span className="grid size-11 place-items-center rounded-lg bg-indigo-50 text-center font-mono text-xs text-indigo-700">SC</span>
+                  <div className="data-row-main"><strong>{title || `Aufgabe ${index + 1}`} <span className="pill blue ml-2">SchoolConnect</span></strong><p>{description || "Keine weitere Beschreibung."}{due ? ` · Fällig: ${due}` : ""}</p></div>
+                </div>
+              );
+            }) : <EmptyState title="Alles erledigt" description="Das Schülerportal meldet aktuell keine Hausaufgaben." />}
+          </section>
+        )}
+      </div>
+    );
+  }
+
   return <div className="page"><PageHeader eyebrow="Lernplan" title="Hausaufgaben"><select aria-label="Klasse wählen" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" value={activeClassId ?? ""} onChange={(event) => selectClass(Number(event.target.value))}>{classes.data?.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>{isTeacher && <Button onClick={() => setCreateOpen(true)}>Aufgabe anlegen</Button>}</PageHeader>
     {classes.isLoading || (activeClassId && homework.isLoading) ? <LoadingState /> : classes.isError || homework.isError ? <ErrorState onRetry={() => { classes.refetch(); homework.refetch(); }} /> : !activeClassId ? <EmptyState title="Keine Klasse verfügbar" description="Sobald du einer Klasse zugeordnet bist, findest du hier ihre Aufgaben." /> : <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">{homework.data?.length ? homework.data.slice().sort((a, b) => a.due_date.localeCompare(b.due_date)).map((item) => {
       const late = new Date(`${item.due_date}T23:59:59`) < new Date();
@@ -55,6 +106,15 @@ export function HomeworkPage() {
     }) : <EmptyState title="Alles erledigt" description={isTeacher ? "Lege die erste Aufgabe für diese Klasse an." : "Für diese Klasse stehen aktuell keine Aufgaben an."} />}</section>}
     {createOpen && <HomeworkDialog subjects={subjects.data ?? []} pending={create.isPending} error={create.isError} onClose={() => setCreateOpen(false)} onSubmit={(data) => create.mutate(data as HomeworkInput)} />}{editing && <HomeworkDialog homework={editing} subjects={subjects.data ?? []} pending={update.isPending} error={update.isError} onClose={() => setEditing(undefined)} onSubmit={(data) => update.mutate({ id: editing.id, data: data as UpdateHomeworkInput })} />}{grading && <SubmissionsDialog homework={grading} onClose={() => setGrading(undefined)} />}
   </div>;
+}
+
+function field(item: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = item[key];
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "number") return String(value);
+  }
+  return "";
 }
 
 function HomeworkDialog({ homework, subjects, onClose, onSubmit, pending, error }: { homework?: Homework; subjects: { id: number; name: string; short: string }[]; onClose: () => void; onSubmit: (data: HomeworkInput | UpdateHomeworkInput) => void; pending: boolean; error: boolean }) {

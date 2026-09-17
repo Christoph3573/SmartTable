@@ -126,3 +126,22 @@ GET    /api/v1/homework/:id/submissions
 POST   /api/v1/homework/:id/submissions
 PATCH  /api/v1/submissions/:id           Abgabe benoten
 ```
+
+## SchoolConnect-Integration `/api/v1/integrations/schoolconnect`
+
+Proxy auf die SchoolConnect-REST-API v0.1.0 (`schoolconnect serve`,
+Binary + systemd-Service via Ansible-Rolle `schoolconnect`). Eigenes
+JWT-Auth bleibt davor; nur lesende Plugin-Funktionen sind freigegeben
+(Allowlist im Backend, `fetch`/Dateidownloads ausgenommen).
+
+```
+GET    /status                      Erreichbarkeit + Pluginliste ({reachable, plugins[]})
+POST   /{plugin}/auth               Plugin-Login (Credentials im Body, Antwort ohne Secret-Werte)
+POST   /{plugin}/logout             Plugin-Session verwerfen
+GET    /{plugin}/{function}         Lesende Funktion (Query-Params werden gereicht)
+POST   /{plugin}/{function}         Lesende Funktion (JSON-Body wird gereicht)
+```
+
+Freigegeben: `schuelerportal.{profil,stundenplan,hausaufgaben,vertretungsplan}`,
+`mebis.{courses,abschnitte,inhalt}`, `bycs-drive.{spaces,list}`,
+`lernplan-bayern.{search,details}` (kein Login nötig).
