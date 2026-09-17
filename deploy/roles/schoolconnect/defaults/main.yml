@@ -1,0 +1,27 @@
+---
+# SchoolConnect v0.1.0 — einheitliche REST-Schnittstelle zu bayerischen
+# Schulplattformen (vgl. https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.1.0).
+# Die Rolle lädt das Release-Binary für die Pi-Architektur (ARM64), legt es
+# nach /opt/schoolconnect und betreibt `schoolconnect serve` als
+# systemd-Service auf 127.0.0.1:<port>. Das SmartTable-Backend erreicht es
+# über SCHOOLCONNECT_BASE_URL (siehe schulapp.env.j2 / docker-compose.yml.j2).
+schoolconnect_version: "v0.1.0"
+schoolconnect_user: "schoolconnect"
+schoolconnect_dir: /opt/schoolconnect
+schoolconnect_binary: "{{ schoolconnect_dir }}/schoolconnect"
+# Der Pi läuft auf ARM64 (linux/arm64) — das Asset heißt
+# schoolconnect-linux-arm64. Falls das Release dieses Asset (noch) nicht
+# enthält, kann hier auf schoolconnect-linux-amd64 umgestellt werden
+# (läuft via QEMU/binfmt, falls installiert) — besser: Release um das
+# ARM64-Asset ergänzen.
+schoolconnect_asset: "schoolconnect-linux-arm64"
+schoolconnect_download_url: "https://github.com/Christoph3573/SchoolConnect/releases/download/{{ schoolconnect_version }}/{{ schoolconnect_asset }}"
+# SHA256 des Release-Assets (aus der GitHub-Release-Seite). Leer lassen zum
+# Überspringen der Prüfung — empfohlen ist das Setzen pro Host/Version.
+schoolconnect_sha256: ""
+schoolconnect_port: 8081
+schoolconnect_bind: "127.0.0.1"
+schoolconnect_log_level: "info"
+# Optionale Plugin-Secrets (werden als Umgebungsvariablen an den Service
+# gereicht, nie geloggt). Formate parst das jeweilige Plugin selbst.
+schoolconnect_env_secrets: {}

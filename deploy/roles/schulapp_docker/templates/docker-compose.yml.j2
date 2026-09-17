@@ -39,6 +39,16 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: "8080"
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      # SchoolConnect läuft als systemd-Service auf dem Host (Rolle
+      # schoolconnect, Default 127.0.0.1:8081). Aus dem Container ist der
+      # Host über das host-gateway erreichbar — extra_hosts unten setzt
+      # host.docker.internal darauf (Linux-Docker versteht den Namen sonst
+      # nicht). Wer SchoolConnect lieber als Compose-Service betreiben will,
+      # setzt SCHOOLCONNECT_BASE_URL=http://schoolconnect:8081 und ergänzt
+      # den Service in diesem Template.
+      SCHOOLCONNECT_BASE_URL: ${SCHOOLCONNECT_BASE_URL:-http://host.docker.internal:8081}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       migrate:
         condition: service_completed_successfully
