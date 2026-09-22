@@ -22,6 +22,12 @@ export type Membership = components["schemas"]["Membership"];
 export type RegisterInput = components["schemas"]["RegisterRequest"];
 export type ChatContact = components["schemas"]["ChatContact"];
 export type CreateChannelInput = components["schemas"]["CreateChannelRequest"];
+export type VocabSet = components["schemas"]["VocabSet"];
+export type CreateVocabSetInput = components["schemas"]["CreateVocabSetRequest"];
+export type UpdateVocabSetInput = components["schemas"]["UpdateVocabSetRequest"];
+export type VocabCard = components["schemas"]["VocabCard"];
+export type CreateVocabCardInput = components["schemas"]["CreateVocabCardRequest"];
+export type UpdateVocabCardInput = components["schemas"]["UpdateVocabCardRequest"];
 
 export type EventInput = components["schemas"]["CreateEventRequest"];
 export type UpdateEventInput = components["schemas"]["UpdateEventRequest"];
@@ -159,4 +165,21 @@ export const schoolApi = {
   // limit=1 keeps this cheap when it's only used to clear an unread badge.
   markChannelRead: (channelId: number) =>
     apiClient.get<ChatMessage[]>(`/api/v1/channels/${channelId}/messages`, { params: { limit: 1 } }),
+
+  // Vokabeln (Lern-Bereich): Sets + Karteikarten mit Leitner-Abfrage.
+  vocabSets: () => apiClient.get<VocabSet[]>("/api/v1/vocab/sets").then((r) => r.data),
+  createVocabSet: (data: CreateVocabSetInput) =>
+    apiClient.post<VocabSet>("/api/v1/vocab/sets", data).then((r) => r.data),
+  updateVocabSet: (id: number, data: UpdateVocabSetInput) =>
+    apiClient.patch<VocabSet>(`/api/v1/vocab/sets/${id}`, data).then((r) => r.data),
+  deleteVocabSet: (id: number) => apiClient.delete(`/api/v1/vocab/sets/${id}`),
+  vocabCards: (setId: number) =>
+    apiClient.get<VocabCard[]>(`/api/v1/vocab/sets/${setId}/cards`).then((r) => r.data),
+  createVocabCard: (setId: number, data: CreateVocabCardInput) =>
+    apiClient.post<VocabCard>(`/api/v1/vocab/sets/${setId}/cards`, data).then((r) => r.data),
+  updateVocabCard: (id: number, data: UpdateVocabCardInput) =>
+    apiClient.patch<VocabCard>(`/api/v1/vocab/cards/${id}`, data).then((r) => r.data),
+  deleteVocabCard: (id: number) => apiClient.delete(`/api/v1/vocab/cards/${id}`),
+  gradeVocabCard: (id: number, known: boolean) =>
+    apiClient.post<VocabCard>(`/api/v1/vocab/cards/${id}/grade`, { known }).then((r) => r.data),
 };

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS vocab_cards;
+DROP TABLE IF EXISTS vocab_sets;

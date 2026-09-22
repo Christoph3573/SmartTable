@@ -81,19 +81,40 @@ const GearIcon = () => (
   </svg>
 );
 
+const CardsIcon = () => (
+  <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122" />
+  </svg>
+);
+
+const SparkIcon = () => (
+  <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+  </svg>
+);
+
 type NavSection = {
   title: string;
   items: NavItem[];
 };
 
 const mainNavItems: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: <HomeIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
   { to: "/timetable", label: "Stundenplan", icon: <CalendarIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
-  { to: "/substitutions", label: "Vertretungen", icon: <SwapIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
-  { to: "/homework", label: "Hausaufgaben", icon: <BookIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/substitutions", label: "Vertretungsplan", icon: <SwapIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
   { to: "/calendar", label: "Kalender", icon: <CalendarIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
   { to: "/files", label: "Dateien", icon: <FolderIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/homework", label: "Hausaufgaben", icon: <BookIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
   { to: "/chat", label: "Chat", icon: <ChatIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+];
+
+const learnNavItems: NavItem[] = [
+  { to: "/lernen/lernplan", label: "Lernplan", icon: <BookIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/lernen/vokabeln", label: "Vokabeln", icon: <CardsIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+  { to: "/lernen/ki-chat", label: "KI-Chat", icon: <SparkIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
+];
+
+const dashboardNavItems: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard", icon: <HomeIcon />, roles: ["student", "teacher", "school_admin", "superadmin", "admin"] },
 ];
 
 const adminNavItems: NavItem[] = [
@@ -114,7 +135,9 @@ export function Sidebar() {
   const visible = (items: NavItem[]) =>
     items.filter((item) => user && item.roles.includes(user.role));
 
-  const mainItems = visible(mainNavItems);
+  const dashboardItems = visible(dashboardNavItems);
+  const schoolItems = visible(mainNavItems);
+  const learnItems = visible(learnNavItems);
   const adminItems = visible(adminNavItems);
   const canJoin = user?.role === "student";
   const roleLabel =
@@ -176,9 +199,11 @@ export function Sidebar() {
   );
 
   const sections: NavSection[] = [
-    { title: "Übersicht", items: mainItems },
+    { title: "", items: dashboardItems },
+    { title: "Schule", items: schoolItems },
+    { title: "Lernen", items: learnItems },
     ...(adminItems.length > 0 ? [{ title: "Verwaltung", items: adminItems } satisfies NavSection] : []),
-  ];
+  ].filter((section) => section.items.length > 0);
 
   return (
     <aside className="sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
@@ -191,10 +216,12 @@ export function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto p-4">
         {sections.map((section) => (
-          <div key={section.title} className="mb-5 last:mb-0">
-            <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              {section.title}
-            </p>
+          <div key={section.title || "start"} className="mb-5 last:mb-0">
+            {section.title && (
+              <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                {section.title}
+              </p>
+            )}
             <ul className="flex flex-col gap-1">
               {section.items.map(renderItem)}
             </ul>

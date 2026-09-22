@@ -68,6 +68,21 @@ services:
       - sc_creds:/data
     restart: unless-stopped
 
+  # KI-Lernchat (spaeter): `opencode serve` als eigener Sidecar, nur
+  # internes Netz (kein ports:). Das Backend proxied
+  # POST /api/v1/integrations/opencode/chat dorthin (Tenant = JWT-user_id).
+  # Noch nicht aktiv — erst einkommentieren, wenn der opencode-Service
+  # steht und der Backend-Proxy verdrahtet ist (+ schoolconnect_repo_src-
+  # analoge Sync-Variable ergaenzen).
+  # opencode:
+  #   build:
+  #     context: ./opencode
+  #   environment:
+  #     OPENCODE_ADDR: ":8082"
+  #   volumes:
+  #     - opencode_data:/data
+  #   restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -83,3 +98,4 @@ volumes:
   postgres_data:
   uploads_data:
   sc_creds:
+  # opencode_data:  # aktivieren zusammen mit dem opencode-Service oben

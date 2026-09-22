@@ -674,6 +674,103 @@ components:
         name:
           type: string
 
+    VocabSet:
+      type: object
+      required: [id, owner_id, title, source_lang, target_lang, card_count]
+      properties:
+        id:
+          type: integer
+        owner_id:
+          type: integer
+        class_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        source_lang:
+          type: string
+        target_lang:
+          type: string
+        card_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    CreateVocabSetRequest:
+      type: object
+      required: [title, source_lang, target_lang]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        source_lang:
+          type: string
+        target_lang:
+          type: string
+        class_id:
+          type: integer
+
+    UpdateVocabSetRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        class_id:
+          type: integer
+
+    VocabCard:
+      type: object
+      required: [id, set_id, front, back, box, due_at]
+      properties:
+        id:
+          type: integer
+        set_id:
+          type: integer
+        front:
+          type: string
+        back:
+          type: string
+        hint:
+          type: string
+        box:
+          type: integer
+        due_at:
+          type: string
+          format: date-time
+
+    CreateVocabCardRequest:
+      type: object
+      required: [front, back]
+      properties:
+        front:
+          type: string
+        back:
+          type: string
+        hint:
+          type: string
+
+    UpdateVocabCardRequest:
+      type: object
+      properties:
+        front:
+          type: string
+        back:
+          type: string
+        hint:
+          type: string
+
+    GradeVocabCardRequest:
+      type: object
+      required: [known]
+      properties:
+        known:
+          type: boolean
+
     RegisterRequest:
       type: object
       required: [email, password, first_name, last_name, school_id]
@@ -2092,6 +2189,192 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Subject"
+
+  /api/v1/vocab/sets:
+    get:
+      tags: [vocab]
+      summary: Eigene Vokabelsets + Klassensets auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Vokabelsets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VocabSet"
+    post:
+      tags: [vocab]
+      summary: Vokabelset anlegen (optional einer Klasse teilen)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVocabSetRequest"
+      responses:
+        "201":
+          description: Vokabelset angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VocabSet"
+
+  /api/v1/vocab/sets/{id}:
+    patch:
+      tags: [vocab]
+      summary: Vokabelset aktualisieren (nur Owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVocabSetRequest"
+      responses:
+        "200":
+          description: Vokabelset aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VocabSet"
+    delete:
+      tags: [vocab]
+      summary: Vokabelset löschen (nur Owner, inkl. Karten)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Vokabelset gelöscht
+
+  /api/v1/vocab/sets/{id}/cards:
+    get:
+      tags: [vocab]
+      summary: Karten eines Vokabelsets auflisten
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Karteikarten
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VocabCard"
+    post:
+      tags: [vocab]
+      summary: Karte zu einem Vokabelset hinzufügen (nur Owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVocabCardRequest"
+      responses:
+        "201":
+          description: Karte angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VocabCard"
+
+  /api/v1/vocab/cards/{id}:
+    patch:
+      tags: [vocab]
+      summary: Karte bearbeiten (nur Owner des Sets)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVocabCardRequest"
+      responses:
+        "200":
+          description: Karte aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VocabCard"
+    delete:
+      tags: [vocab]
+      summary: Karte löschen (nur Owner des Sets)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Karte gelöscht
+
+  /api/v1/vocab/cards/{id}/grade:
+    post:
+      tags: [vocab]
+      summary: "Karte bewerten (Leitner: gewusst → Box+1, sonst Box 1)"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GradeVocabCardRequest"
+      responses:
+        "200":
+          description: Karte mit neuem Box-Stand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VocabCard"
 
   /api/v1/integrations/schoolconnect/status:
     get:
