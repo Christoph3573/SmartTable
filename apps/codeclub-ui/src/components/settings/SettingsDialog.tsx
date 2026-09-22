@@ -10,6 +10,7 @@ import {
 } from "../../api/schoolconnect";
 import { Button } from "../ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "../ui/Page";
+import { DebugConsole } from "./DebugConsole";
 
 const PROVIDER_OPTIONS: { value: DataProvider; title: string; description: string }[] = [
   {
@@ -129,9 +130,18 @@ export function SettingsContent() {
             <SchoolConnectPanel />
           </section>
         )}
-    </>
-  );
-}
+
+        <section className="mt-5" aria-label="Diagnose">
+          <h3 className="mb-1 text-sm font-bold text-gray-900 dark:text-white">Diagnose</h3>
+          <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+            Erreichbarkeit der internen Dienste (OpenCode, SchoolConnect) prüfen und eigene
+            API-Anfragen senden.
+          </p>
+          <DebugConsole />
+        </section>
+      </>
+    );
+  }
 
 function SchoolConnectPanel() {
   const client = useQueryClient();
