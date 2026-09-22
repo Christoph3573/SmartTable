@@ -54,6 +54,12 @@ import (
 
 const openCodeDefaultBaseURL = "http://opencode:8082"
 
+// openCodeDefaultModel ist das Default-Modell für neue Lernchat-Sessions
+// (OpenRouter-ID im Format provider/modell). Env OPENCODE_MODEL schlägt
+// den Default; die Session-Antwort von POST /session enthält provider+model
+// und wird in opencode_sessions gespeichert.
+const openCodeDefaultModel = "openrouter/deepseek-v4.1-flash"
+
 const openCodeHint = "OpenCode-Service prüfen: läuft als Compose-Service " +
 	"`opencode` (intern http://opencode:8082, kein Host-Port, `opencode serve " +
 	"--hostname 0.0.0.0 --port 8082`) — lokal via `opencode serve` und " +
@@ -100,6 +106,34 @@ func (h *Server) openCodeBase() string {
 		base = openCodeDefaultBaseURL
 	}
 	return strings.TrimRight(base, "/")
+}
+
+// openCodeModel liefert das Default-Modell (ohne Leerzeichen). Env
+// OPENCODE_MODEL schlägt Server-Feld; Default ist
+// openrouter/deepseek-v4.1-flash. Format provider/modell (z. B.
+// openrouter/deepseek-v4.1-flash) — das Backend splittet beim Senden an
+// POST /session/{id}/message in {providerID, modelID}.
+func (h *Server) openCodeModel() string {
+	model := h.OpenCodeModel
+	if env := strings.TrimSpace(os.Getenv("OPENCODE_MODEL")); env != "" {
+		model = env
+	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		model = openCodeDefaultModel
+	}
+	return model
+}
+
+// openCodeModelPayload splittet "provider/modell" in das {providerID,
+// modelID}-Objekt für POST /session/{id}/message. Ohne "/" kommt nil
+// zurück (OpenCode nutzt dann sein eigenes Default aus opencode.json).
+func openCodeModelPayload(model string) map[string]string {
+	parts := strings.SplitN(strings.TrimSpace(model), "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return nil
+	}
+	return map[string]string{"providerID": parts[0], "modelID": parts[1]}
 }
 
 // openCodeWorkspaceRoot liefert das Root-Verzeichnis für Tenant-Workspaces
@@ -492,9 +526,9 @@ type openCodePart struct {
 }
 
 // PostApiV1IntegrationsOpencodeSessionsIdMessages schickt den User-Prompt an
-// OpenCode (system-Prompt + Tools bis auf question deaktiviert), speichert
-// User-Nachricht + Agent-Antwort und pusht die Antwort zusätzlich als
-// WebSocket-Event (type "opencode", session_id) an den User.
+// OpenCode (system-Prompt + Default-Modell + Tools bis auf question
+// deaktiviert), speichert User-Nachricht + Agent-Antwort und pusht die
+// Antwort zusätzlich als WebSocket-Event (type "opencode", session_id).
 func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.ResponseWriter, r *http.Request, id int) {
 	c := h.claims(w, r)
 	if c == nil {
@@ -519,13 +553,17 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.Response
 		return
 	}
 	base := h.openCodeBase()
+	msgBody := map[string]any{
+		"system": openCodeSystemPrompt,
+		"tools":  map[string]bool{"question": true},
+		"parts":  []map[string]string{{"type": "text", "text": content}},
+	}
+	if model := openCodeModelPayload(h.openCodeModel()); model != nil {
+		msgBody["model"] = model
+	}
 	status, raw, err := openCodeDo(openCodeClient(), http.MethodPost,
 		base+"/session/"+url.PathEscape(s.OpencodeID)+"/message?directory="+url.QueryEscape(s.Workspace),
-		map[string]any{
-			"system": openCodeSystemPrompt,
-			"tools":  map[string]bool{"question": true},
-			"parts":  []map[string]string{{"type": "text", "text": content}},
-		})
+		msgBody)
 	if err != nil {
 		openCodeUnreachable(w, base)
 		return

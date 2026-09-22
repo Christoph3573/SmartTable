@@ -42,6 +42,10 @@ jobs:
 
       - name: Run Ansible Playbook
         working-directory: deploy
+        env:
+          # API-Key als Env (nicht -e), damit er nie in `ps` auftaucht;
+          # ansible liest OPENROUTER_API_KEY direkt als openrouter_api_key.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-christoph \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
@@ -92,6 +96,11 @@ jobs:
           # Read as an env var (not -e on the command line) so it never shows
           # up in `ps` output on the runner; ansible-core picks this up automatically.
           ANSIBLE_BECOME_PASS: ${{ secrets.EMANUEL_BECOME_PASS }}
+          # API-Key als Env (nicht -e): ansible liest OPENROUTER_API_KEY
+          # direkt als Variable openrouter_api_key (gleicher Name, lower-case
+          # wird automatisch gemappt). Secret muss in GitHub hinterlegt sein:
+          # Settings → Secrets → Actions → OPENROUTER_API_KEY.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-emanuel \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \

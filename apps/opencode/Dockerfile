@@ -22,8 +22,13 @@
 # direkt mit diesem Service (kein ports:, nur internes Compose-Netz).
 #
 # Modell-Credentials: OPENROUTER_API_KEY (oder ein anderer Provider-Key)
-# kommt als Env aus .env/Ansible-Vault — der Container nutzt ihn global
-# für alle Tenant-Sessions. OPENCODE_VERSION pinnt das Release.
+# kommt als Env aus .env (im CI aus dem GitHub Secret OPENROUTER_API_KEY) —
+# der Container nutzt ihn global für alle Tenant-Sessions.
+# OPENCODE_VERSION pinnt das Release. Das Default-Modell
+# (openrouter/deepseek-v4.1-flash — verifiziert in models.dev:
+# tool_call=true, 1M Kontext) steht in der mit kopierten opencode.json
+# (`model`-Key) und gilt für alle Tenant-Sessions; das Backend gibt es
+# zusätzlich pro Nachricht mit (Feld `model`, Env OPENCODE_MODEL).
 FROM debian:12-slim
 
 ARG OPENCODE_VERSION=v1.18.32
@@ -32,7 +37,7 @@ ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget tar && \
     rm -rf /var/lib/apt/lists && \
     MACHINE="$(uname -m)" && \
-    if [ "$MACHINE" = "aarch64" ] || [ "$TARGETARCH" = "arm64" ]; then OC_ARCH="arm64"; else OC_ARCH="x64"; fi && \
+    if [ "$MACHINE" = "aarch64" ] || [ "$MACHINE" = "arm64" ] || [ "$TARGETARCH" = "arm64" ]; then OC_ARCH="arm64"; else OC_ARCH="x64"; fi && \
     echo "Downloading opencode ${OPENCODE_VERSION} for linux/${OC_ARCH} (uname -m=${MACHINE}, TARGETARCH=${TARGETARCH})" && \
     wget -O /tmp/opencode.tar.gz \
       "https://github.com/anomalyco/opencode/releases/download/${OPENCODE_VERSION}/opencode-linux-${OC_ARCH}.tar.gz" && \
@@ -43,8 +48,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 
 ENV OPENCODE_PORT=8082
 
+# Default-Modell + Verhalten (liegt im Build-Kontext als opencode.json —
+# siehe Datei nebenan; wird nach /root/.config/opencode/opencode.json
+# kopiert = Global Config des serve-Prozesses).
+COPY opencode.json /root/.config/opencode/opencode.json
+
 VOLUME /workspaces
 EXPOSE 8082
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:${OPENCODE_PORT:-8082}/global/health > /dev/null || exit 1
 
 # Kein API-Passwort: Der Service ist nur im Compose-Netz erreichbar, das
 # Backend ist die Auth-Grenze (JWT + Ownership-Checks). Workspaces werden

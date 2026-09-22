@@ -113,6 +113,10 @@ func main() {
 		// Compose zeigt OPENCODE_BASE_URL auf einen manuellen `opencode serve`.
 		OpenCodeBaseURL:       envOrDefault("OPENCODE_BASE_URL", "http://opencode:8082"),
 		OpenCodeWorkspaceRoot: envOrDefault("OPENCODE_WORKSPACE_ROOT", "/workspaces"),
+		// Default-Modell für neue Lernchat-Sessions (OpenRouter-ID
+		// provider/modell); das Backend gibt es pro Nachricht an
+		// POST /session/{id}/message mit (Feld `model`).
+		OpenCodeModel: envOrDefault("OPENCODE_MODEL", "openrouter/deepseek-v4.1-flash"),
 	}
 
 	r.Get("/ws", srv.HandleWS)

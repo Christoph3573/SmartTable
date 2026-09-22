@@ -52,16 +52,17 @@ services:
       OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-http://opencode:8082}
       OPENCODE_WORKSPACE_ROOT: /workspaces
       OPENCODE_MCP_URL: http://backend:8080/api/v1/mcp
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-openrouter/deepseek-v4.1-flash}
     depends_on:
       migrate:
         condition: service_completed_successfully
       schoolconnect:
-        condition: service_started
+        condition: service_healthy
       opencode:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
-      - workspaces:/workspaces:ro
+      - workspaces:/workspaces
     restart: unless-stopped
 
   # SchoolConnect v0.3.0 Multi-Tenant als Sidecar: nur internes Netz
@@ -82,8 +83,9 @@ services:
   # für alle User, nur internes Netz (kein ports:). Tenant-Trennung:
   # Backend ruft die REST-API mit ?directory=/workspaces/<user_id> auf
   # (directory-scoped, pro User isoliert) und prüft Ownership in
-  # opencode_sessions. Modell-Key global via OPENROUTER_API_KEY (aus .env).
-  # Der Browser spricht NIE direkt mit diesem Service (JWT-Grenze=Backend).
+  # opencode_sessions. Modell-Key global via OPENROUTER_API_KEY (aus .env,
+  # im CI aus dem GitHub Secret OPENROUTER_API_KEY). Der Browser spricht
+  # NIE direkt mit diesem Service (JWT-Grenze=Backend).
   opencode:
     build:
       context: ./opencode

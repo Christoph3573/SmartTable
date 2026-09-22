@@ -45,6 +45,12 @@ type Server struct {
 	// (dasselbe Volume mountet der opencode-Container). Env
 	// OPENCODE_WORKSPACE_ROOT schlägt dieses Feld; Default /workspaces.
 	OpenCodeWorkspaceRoot string
+	// OpenCodeModel ist das Default-Modell für neue Lernchat-Sessions
+	// (OpenRouter-ID im Format provider/modell, z. B.
+	// openrouter/deepseek-v4.1-flash). Env OPENCODE_MODEL schlägt dieses
+	// Feld; Default siehe openCodeDefaultModel in opencode.go. Das Backend
+	// gibt es bei jeder Nachricht an POST /session/{id}/message mit.
+	OpenCodeModel string
 }
 
 func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {
