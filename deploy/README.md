@@ -11,31 +11,34 @@ Ansible-Playbooks und Rollen für den SmartTable-Deploy auf den Raspberry Pis.
 | `inventory/host_vars/<host>/vars.yml` | Host-spezifische Ports, Pfade und Secrets |
 | `deploy.yml` | Startet den vollständigen Compose-Stack und den SSH-Tunnel |
 | `provision.yml` | Richtet die Betriebssystem-Basis des Hosts ein |
-| `roles/schulapp_docker/` | Synchronisiert die Quellen und führt Docker Compose aus |
-| `roles/schoolconnect/` | Installiert das SchoolConnect-v0.1.0-Binary und betreibt `serve` als systemd-Service |
+| `roles/schulapp_docker/` | Synchronisiert die Quellen (Backend, Frontend, SchoolConnect-Sidecar) und führt Docker Compose aus |
+| `roles/schoolconnect.systemd.disabled/` | Archivierte alte Rolle (SchoolConnect-v0.1.0-Binary als systemd-Service) — nicht mehr im Deploy |
 | `roles/ssh_tunnel/` | Stellt den Reverse-Tunnel zur Code-Club-VM her |
 
-## SchoolConnect (Data-Provider)
+## SchoolConnect (Data-Provider, v0.3.0 Multi-Tenant als Sidecar)
 
-Die Rolle `schoolconnect` lädt das Release-Binary v0.1.0 von GitHub
-(`schoolconnect-linux-arm64` für den Pi) nach `/opt/schoolconnect/` und
-startet `schoolconnect serve` als systemd-Service auf
-`127.0.0.1:8081` (nur Loopback — kein Tunnel/Caddy nötig, der Zugriff
-läuft ausschließlich über das SmartTable-Backend).
+SchoolConnect läuft als Compose-Service `schoolconnect`
+(`apps/schoolconnect/Dockerfile` lädt das v0.3.0-Release-Binary für die
+Build-Architektur — `linux/arm64` auf dem Pi, `linux/amd64` sonst — und
+startet `schoolconnect serve` mit `SC_REQUIRE_TENANT=true`): nur
+internes Netz (kein `ports:`, kein Tunnel/Caddy nötig, der Zugriff
+läuft ausschließlich über das SmartTable-Backend via
+`http://schoolconnect:8081`).
 
-- Variablen: siehe `roles/schoolconnect/defaults/main.yml`
-  (`schoolconnect_version`, `schoolconnect_port`, optional
-  `schoolconnect_sha256` für die Checksummenprüfung und
-  `schoolconnect_env_secrets` für Plugin-Secrets wie
-  `SCHUELERPORTAL_SECRET`).
-- Das Backend erreicht SchoolConnect über `SCHOOLCONNECT_BASE_URL`
-  (aus dem Container via `host.docker.internal`, siehe
-  `docker-compose.yml.j2`); der direkte Systemd-Deploy nutzt
-  `http://127.0.0.1:8081`.
-- User-Logins (Schülerportal/mebis/ByCS) laufen pro Aufruf über die App
+- Variablen: siehe `roles/schulapp_docker/defaults/main.yml`
+  (`sc_tenant_shared_secret` für die optionale HMAC-Signatur von
+  `X-SC-Tenant` — muss auf Backend- und Sidecar-Seite identisch sein,
+  sonst leer — und `sc_log_level`).
+- Tenant-Trennung: Das Backend setzt `X-SC-Tenant` aus der JWT-`user_id`
+  (nie aus Client-Parametern); Credentials + Login-Sessions sind pro
+  App-Benutzer isoliert, Logout trifft nur die eigene Session.
+  Persistenz im Volume `sc_creds` (`SCHOOLCONNECT_CONFIG_DIR=/data`).
+- User-Logins (Schülerportal/mebis/ByCS) laufen pro Benutzer über die App
   (Einstellungen → SchoolConnect) — die SchoolConnect-Runtime verwaltet
-  ihre Sessions selbst, im Backend wird nichts gespeichert.
-- Smoke-Tests der Rolle: `schoolconnect list` + `GET /api` müssen 200 liefern.
+  ihre Sessions pro Tenant selbst, im Backend wird nichts gespeichert.
+- Smoke-Test: `GET /api` des Sidecars (tenantlos) + Backend-Login müssen
+  funktionieren; zwei App-User mit eigenem Schul-Login dürfen sich nicht
+  vermischen.
 
 ## Schnellstart
 

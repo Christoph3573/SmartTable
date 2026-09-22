@@ -20,7 +20,7 @@ const PROVIDER_OPTIONS: { value: DataProvider; title: string; description: strin
   {
     value: "schoolconnect",
     title: "SchoolConnect",
-    description: "Externe Schulplattformen (Schülerportal, mebis, ByCS Drive, LehrplanPLUS) via SchoolConnect-API v0.1.0.",
+    description: "Externe Schulplattformen (Schülerportal, mebis, ByCS Drive, LehrplanPLUS) via SchoolConnect-API v0.3.0 — pro Benutzer isoliert.",
   },
 ];
 
@@ -117,7 +117,7 @@ export function SettingsContent() {
             ))}
           </div>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Gilt für Stundenplan, Vertretungsplan und Hausaufgaben. Chat, Kalender und Dateien bleiben immer bei SmartTable.
+            Gilt für Stundenplan, Vertretungsplan und Hausaufgaben. Chat, Kalender und Dateien bleiben immer bei SmartTable. SchoolConnect-Logins sind pro Benutzer isoliert — Abmelden betrifft nur die eigene Session.
           </p>
         </section>
 
@@ -151,19 +151,11 @@ function SchoolConnectPanel() {
   if (!status.data.reachable) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-        <strong className="block">SchoolConnect läuft nicht.</strong>
-        <p className="mt-1">{status.data.hint ?? "Bitte die SchoolConnect-REST-API starten."}</p>
-        <p className="mt-2 font-mono text-xs">
-          Binary aus v0.1.0 laden, dann: REST_ADDR=:8081 schoolconnect serve
+        <strong className="block">SchoolConnect läuft nicht (interner Sidecar-Dienst).</strong>
+        <p className="mt-1">{status.data.hint ?? "Bitte den SchoolConnect-Sidecar prüfen."}</p>
+        <p className="mt-2 text-xs">
+          Jeder App-Benutzer meldet sich mit eigenem Schul-Login an — Sessions sind pro Benutzer isoliert.
         </p>
-        <a
-          className="mt-2 inline-block font-semibold underline"
-          href="https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.1.0"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Release v0.1.0 öffnen
-        </a>
         <div className="mt-3">
           <Button size="sm" variant="secondary" onClick={() => status.refetch()}>
             Erneut prüfen
@@ -224,7 +216,7 @@ function PluginCard({
     onSuccess: () => {
       setPassword("");
       setOpen(false);
-      setCheckResult("Angemeldet — Sessions werden von SchoolConnect verwaltet.");
+      setCheckResult("Angemeldet — gilt nur für dich, andere Benutzer bleiben unberührt.");
       client.invalidateQueries({ queryKey: ["schoolconnect"] });
     },
   });

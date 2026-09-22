@@ -1,9 +1,12 @@
 // Package handler — SchoolConnect-Integration.
 //
 // Das SmartTable-Backend proxied ausgewählte Aufrufe an die REST-API von
-// SchoolConnect (v0.1.0, "schoolconnect serve", siehe
-// https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.1.0).
-// Jede Plugin-Funktion ist dort automatisch ein Endpunkt:
+// SchoolConnect (v0.3.0 Multi-Tenant, "schoolconnect serve", siehe
+// https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.3.0).
+// SchoolConnect läuft als Sidecar-Service im Compose-Netz
+// (SCHOOLCONNECT_BASE_URL, Default http://schoolconnect:8081) mit
+// SC_REQUIRE_TENANT=true. Jede Plugin-Funktion ist dort automatisch
+// ein Endpunkt:
 //
 //	GET|POST /api/<plugin>/<funktion>?param=...
 //
@@ -14,36 +17,49 @@
 //	POST /api/v1/integrations/schoolconnect/{plugin}/logout
 //	GET|POST /api/v1/integrations/schoolconnect/{plugin}/{funktion}
 //
+// Mandanten-Trennung: Der Proxy setzt pro Request `X-SC-Tenant` aus der
+// JWT-user_id (nie aus Client-Parametern) — SchoolConnect isoliert
+// Credentials + Login-Sessions pro Tenant (pro App-Benutzer). Logout
+// trifft daher nur die eigene Session. Optional signiert der Proxy den
+// Tenant mit HMAC (Env SC_TENANT_SHARED_SECRET, Header X-SC-Tenant-Sig).
+//
 // Der generische Call ist auf lesende Funktionen begrenzt (Allowlist);
 // "fetch"-Funktionen (serverseitiger Dateidownload ins SchoolConnect-
 // Dateisystem) und auth/logout (eigene Endpunkte) sind ausgenommen.
 // Credentials gehen nur als POST-Body an SchoolConnect und werden hier
 // weder geloggt noch gespeichert — die SchoolConnect-Runtime verwaltet
-// ihre Sessions selbst (einmal auth, überall angemeldet).
+// ihre Sessions selbst (einmal auth, überall angemeldet — pro Benutzer
+// isoliert).
 package handler
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 )
 
-const schoolConnectDefaultBaseURL = "http://host.docker.internal:8081"
+const schoolConnectDefaultBaseURL = "http://schoolconnect:8081"
 
-// Hinweis, wenn SchoolConnect nicht läuft. Eigener Port 8081, weil das
-// SmartTable-Backend selbst schon auf :8080 hört. Auf dem Pi läuft
-// SchoolConnect als systemd-Service (deploy/roles/schoolconnect),
-// lokal per `REST_ADDR=:8081 schoolconnect serve` auf dem Host.
-const schoolConnectHint = "SchoolConnect-REST starten: auf dem Pi via Ansible-Rolle " +
-	"schoolconnect (deploy.yml), lokal via `REST_ADDR=:8081 schoolconnect serve` — Binary aus " +
-	"https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.1.0"
+// Hinweis, wenn SchoolConnect nicht läuft: Sidecar-Service im Compose-Netz
+// (kein Host-Port, kein host-gateway). Lokal ohne Compose mit
+// SCHOOLCONNECT_BASE_URL=http://127.0.0.1:8081 auf einen manuell
+// gestarteten Sidecar (`SC_REQUIRE_TENANT=true REST_ADDR=:8081
+// schoolconnect serve`, Binary aus dem Release unten) zeigen.
+const schoolConnectHint = "SchoolConnect-Sidecar prüfen: läuft als Compose-Service " +
+	"`schoolconnect` (intern http://schoolconnect:8081, kein Host-Port) — lokal via " +
+	"`SC_REQUIRE_TENANT=true REST_ADDR=:8081 schoolconnect serve`, Binary aus " +
+	"https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.3.0"
 
 // scAuthPlugins sind die Plugins mit Login (Runtime generiert auth/logout).
 var scAuthPlugins = map[string]bool{
@@ -96,8 +112,11 @@ func (h *Server) schoolConnectBase() string {
 }
 
 // schoolConnectDo schickt einen Request an SchoolConnect und gibt
-// Statuscode + Body (max. 8 MB) zurück.
-func schoolConnectDo(client *http.Client, method, rawURL string, body any) (int, []byte, error) {
+// Statuscode + Body (max. 8 MB) zurück. tenant wird als X-SC-Tenant
+// gesetzt (aus der JWT-user_id, nie aus Client-Parametern); ist
+// SC_TENANT_SHARED_SECRET konfiguriert, wird zusätzlich X-SC-Tenant-Sig
+// (HMAC-SHA256 über den Tenant, Hex) gesetzt.
+func schoolConnectDo(client *http.Client, method, rawURL string, tenant string, body any) (int, []byte, error) {
 	var reader io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
@@ -114,6 +133,14 @@ func schoolConnectDo(client *http.Client, method, rawURL string, body any) (int,
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "application/json")
+	if tenant != "" {
+		req.Header.Set("X-SC-Tenant", tenant)
+		if secret := strings.TrimSpace(os.Getenv("SC_TENANT_SHARED_SECRET")); secret != "" {
+			mac := hmac.New(sha256.New, []byte(secret))
+			mac.Write([]byte(tenant))
+			req.Header.Set("X-SC-Tenant-Sig", hex.EncodeToString(mac.Sum(nil)))
+		}
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, nil, err
@@ -126,6 +153,17 @@ func schoolConnectDo(client *http.Client, method, rawURL string, body any) (int,
 	return resp.StatusCode, raw, nil
 }
 
+// schoolConnectTenant liefert den Tenant für SchoolConnect: die
+// JWT-user_id als String (pro App-Benutzer isoliert). Gibt "" zurück
+// und schreibt 401, wenn kein authentifizierter User vorliegt.
+func (h *Server) schoolConnectTenant(w http.ResponseWriter, r *http.Request) string {
+	c := h.claims(w, r)
+	if c == nil {
+		return ""
+	}
+	return strconv.Itoa(c.UserID)
+}
+
 func schoolConnectUnreachable(w http.ResponseWriter) {
 	writeJSON(w, http.StatusBadGateway, map[string]string{
 		"error": "SchoolConnect ist nicht erreichbar",
@@ -136,13 +174,14 @@ func schoolConnectUnreachable(w http.ResponseWriter) {
 // HandleSchoolConnectStatus meldet Erreichbarkeit + verfügbare Plugins.
 // Immer HTTP 200 mit reachable-Flag, damit das Frontend zwischen
 // "nicht konfiguriert" und "Fehler" unterscheiden und eine
-// Setup-Anleitung zeigen kann.
+// Setup-Anleitung zeigen kann. Der tenantlose /api-Index ist in
+// SchoolConnect bewusst frei (kein Tenant nötig).
 func (h *Server) HandleSchoolConnectStatus(w http.ResponseWriter, r *http.Request) {
 	if h.claims(w, r) == nil {
 		return
 	}
 	base := h.schoolConnectBase()
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, base+"/api", nil)
+	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, base+"/api", "", nil)
 	if err != nil || status != http.StatusOK {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"configured": true,
@@ -192,10 +231,12 @@ func (h *Server) HandleSchoolConnectStatus(w http.ResponseWriter, r *http.Reques
 }
 
 // HandleSchoolConnectAuth leitet einen Login an SchoolConnect weiter
-// (POST /api/{plugin}/auth). Antwort enthält nie Secret-Werte,
+// (POST /api/{plugin}/auth, mit X-SC-Tenant aus der JWT-user_id —
+// pro App-Benutzer isoliert). Antwort enthält nie Secret-Werte,
 // nur Key-Namen — das garantiert die SchoolConnect-Runtime.
 func (h *Server) HandleSchoolConnectAuth(w http.ResponseWriter, r *http.Request) {
-	if h.claims(w, r) == nil {
+	tenant := h.schoolConnectTenant(w, r)
+	if tenant == "" {
 		return
 	}
 	plugin := chi.URLParam(r, "plugin")
@@ -208,7 +249,7 @@ func (h *Server) HandleSchoolConnectAuth(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "ungültiges JSON")
 		return
 	}
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/auth", creds)
+	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/auth", tenant, creds)
 	if err != nil {
 		schoolConnectUnreachable(w)
 		return
@@ -219,9 +260,10 @@ func (h *Server) HandleSchoolConnectAuth(w http.ResponseWriter, r *http.Request)
 }
 
 // HandleSchoolConnectLogout verwirft die SchoolConnect-Session
-// (POST /api/{plugin}/logout).
+// (POST /api/{plugin}/logout, nur die eigene Tenant-Session).
 func (h *Server) HandleSchoolConnectLogout(w http.ResponseWriter, r *http.Request) {
-	if h.claims(w, r) == nil {
+	tenant := h.schoolConnectTenant(w, r)
+	if tenant == "" {
 		return
 	}
 	plugin := chi.URLParam(r, "plugin")
@@ -229,7 +271,7 @@ func (h *Server) HandleSchoolConnectLogout(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "Plugin "+plugin+" braucht keine Anmeldung")
 		return
 	}
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/logout", map[string]any{})
+	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/logout", tenant, map[string]any{})
 	if err != nil {
 		schoolConnectUnreachable(w)
 		return
@@ -240,10 +282,13 @@ func (h *Server) HandleSchoolConnectLogout(w http.ResponseWriter, r *http.Reques
 }
 
 // HandleSchoolConnectCall proxied eine lesende Plugin-Funktion:
-// GET-Query bzw. POST-JSON-Body werden 1:1 an SchoolConnect gereicht,
+// GET-Query bzw. POST-JSON-Body werden 1:1 an SchoolConnect gereicht
+// (mit X-SC-Tenant aus der JWT-user_id — pro App-Benutzer isoliert),
 // Antwort (Result-Envelope {plugin, function, data}) kommt unverändert zurück.
+// Lernplan-Bayern (öffentlich, kein Login) wird tenantlos gefragt.
 func (h *Server) HandleSchoolConnectCall(w http.ResponseWriter, r *http.Request) {
-	if h.claims(w, r) == nil {
+	tenant := h.schoolConnectTenant(w, r)
+	if tenant == "" {
 		return
 	}
 	plugin := chi.URLParam(r, "plugin")
@@ -252,6 +297,9 @@ func (h *Server) HandleSchoolConnectCall(w http.ResponseWriter, r *http.Request)
 	if !ok || !allowed[function] {
 		writeError(w, http.StatusNotFound, "Funktion "+plugin+"/"+function+" ist nicht freigegeben")
 		return
+	}
+	if plugin == "lernplan-bayern" {
+		tenant = ""
 	}
 
 	target := h.schoolConnectBase() + "/api/" + url.PathEscape(plugin) + "/" + url.PathEscape(function)
@@ -270,12 +318,12 @@ func (h *Server) HandleSchoolConnectCall(w http.ResponseWriter, r *http.Request)
 				return
 			}
 		}
-		status, raw, err = schoolConnectDo(schoolConnectClient(), http.MethodPost, target, body)
+		status, raw, err = schoolConnectDo(schoolConnectClient(), http.MethodPost, target, tenant, body)
 	} else {
 		if query := r.URL.RawQuery; query != "" {
 			target += "?" + query
 		}
-		status, raw, err = schoolConnectDo(schoolConnectClient(), http.MethodGet, target, nil)
+		status, raw, err = schoolConnectDo(schoolConnectClient(), http.MethodGet, target, tenant, nil)
 	}
 	if err != nil {
 		schoolConnectUnreachable(w)

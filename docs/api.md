@@ -129,10 +129,14 @@ PATCH  /api/v1/submissions/:id           Abgabe benoten
 
 ## SchoolConnect-Integration `/api/v1/integrations/schoolconnect`
 
-Proxy auf die SchoolConnect-REST-API v0.1.0 (`schoolconnect serve`,
-Binary + systemd-Service via Ansible-Rolle `schoolconnect`). Eigenes
-JWT-Auth bleibt davor; nur lesende Plugin-Funktionen sind freigegeben
-(Allowlist im Backend, `fetch`/Dateidownloads ausgenommen).
+Proxy auf die SchoolConnect-REST-API v0.3.0 (Sidecar-Service
+`schoolconnect` im Compose-Netz, `SC_REQUIRE_TENANT=true`). Eigenes
+JWT-Auth bleibt davor; der Proxy setzt `X-SC-Tenant` aus der
+JWT-`user_id` (optional HMAC-signiert via `X-SC-Tenant-Sig`, Secret aus
+`SC_TENANT_SHARED_SECRET`) — Credentials + Login-Sessions sind pro
+App-Benutzer isoliert, Logout trifft nur die eigene Session. Nur
+lesende Plugin-Funktionen sind freigegeben (Allowlist im Backend,
+`fetch`/Dateidownloads ausgenommen).
 
 ```
 GET    /status                      Erreichbarkeit + Pluginliste ({reachable, plugins[]})

@@ -3,6 +3,5 @@
   hosts: webservers
   become: true
   roles:
-    - schoolconnect
     - schulapp_docker
     - ssh_tunnel

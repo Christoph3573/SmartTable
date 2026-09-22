@@ -101,16 +101,17 @@ func main() {
 		// backwards-compatible local override.
 		UploadDir:            envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
 		Hub:                  ws.NewHub(),
-		// SchoolConnect läuft auf dem Pi als systemd-Service (deploy/roles/
-		// schoolconnect); im Docker-Setup ist der Host via host-gateway
-		// erreichbar (siehe deploy docker-compose.yml.j2).
-		SchoolConnectBaseURL: envOrDefault("SCHOOLCONNECT_BASE_URL", "http://host.docker.internal:8081"),
+		// SchoolConnect läuft als Sidecar-Service im Compose-Netz
+		// ("schoolconnect:8081", SC_REQUIRE_TENANT=true); der Proxy setzt
+		// X-SC-Tenant aus der JWT-user_id (pro App-Benutzer isoliert).
+		SchoolConnectBaseURL: envOrDefault("SCHOOLCONNECT_BASE_URL", "http://schoolconnect:8081"),
 	}
 
 	r.Get("/ws", srv.HandleWS)
 
-	// SchoolConnect-Integration (v0.1.0-Proxy): eigenes Auth (JWT) bleibt
-	// davor — der Proxy selbst erreicht das SchoolConnect-REST via Server-Netz.
+	// SchoolConnect-Integration (v0.3.0-Proxy, Multi-Tenant-Sidecar):
+	// eigenes Auth (JWT) bleibt davor — der Proxy setzt X-SC-Tenant aus
+	// der JWT-user_id und erreicht das SchoolConnect-REST via Server-Netz.
 	r.Route("/api/v1/integrations/schoolconnect", func(r chi.Router) {
 		r.Get("/status", srv.HandleSchoolConnectStatus)
 		r.Post("/{plugin}/auth", srv.HandleSchoolConnectAuth)

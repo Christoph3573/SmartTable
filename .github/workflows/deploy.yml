@@ -45,7 +45,8 @@ jobs:
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-christoph \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
-            -e frontend_repo_src="$GITHUB_WORKSPACE/apps/codeclub-ui"
+            -e frontend_repo_src="$GITHUB_WORKSPACE/apps/codeclub-ui" \
+            -e schoolconnect_repo_src="$GITHUB_WORKSPACE/apps/schoolconnect"
 
   deploy-emanuel:
     if: github.ref == 'refs/heads/main'
@@ -93,4 +94,5 @@ jobs:
         run: |
           ansible-playbook deploy.yml -i inventory --limit pi-emanuel \
             -e backend_repo_src="$GITHUB_WORKSPACE/apps/schulapp-backend" \
-            -e frontend_repo_src="$GITHUB_WORKSPACE/apps/codeclub-ui"
+            -e frontend_repo_src="$GITHUB_WORKSPACE/apps/codeclub-ui" \
+            -e schoolconnect_repo_src="$GITHUB_WORKSPACE/apps/schoolconnect"

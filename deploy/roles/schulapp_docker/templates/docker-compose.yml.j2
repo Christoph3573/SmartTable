@@ -39,21 +39,33 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: "8080"
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
-      # SchoolConnect läuft als systemd-Service auf dem Host (Rolle
-      # schoolconnect, Default 127.0.0.1:8081). Aus dem Container ist der
-      # Host über das host-gateway erreichbar — extra_hosts unten setzt
-      # host.docker.internal darauf (Linux-Docker versteht den Namen sonst
-      # nicht). Wer SchoolConnect lieber als Compose-Service betreiben will,
-      # setzt SCHOOLCONNECT_BASE_URL=http://schoolconnect:8081 und ergänzt
-      # den Service in diesem Template.
-      SCHOOLCONNECT_BASE_URL: ${SCHOOLCONNECT_BASE_URL:-http://host.docker.internal:8081}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      # SchoolConnect v0.3.0 als Sidecar-Service im Compose-Netz
+      # (SC_REQUIRE_TENANT=true). Der Proxy setzt X-SC-Tenant aus der
+      # JWT-user_id (pro App-Benutzer isoliert); optional HMAC via
+      # SC_TENANT_SHARED_SECRET (muss zum Sidecar passen).
+      SCHOOLCONNECT_BASE_URL: ${SCHOOLCONNECT_BASE_URL:-http://schoolconnect:8081}
+      SC_TENANT_SHARED_SECRET: ${SC_TENANT_SHARED_SECRET:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
+      schoolconnect:
+        condition: service_started
     volumes:
       - uploads_data:/app/uploads
+    restart: unless-stopped
+
+  # SchoolConnect v0.3.0 Multi-Tenant als Sidecar: nur internes Netz
+  # (kein ports:, kein host-gateway). Credentials/Sessions liegen in
+  # /data (Volume sc_creds), getrennt pro Tenant (JWT-user_id).
+  schoolconnect:
+    build:
+      context: ./schoolconnect
+    environment:
+      SC_REQUIRE_TENANT: "true"
+      SC_TENANT_SHARED_SECRET: ${SC_TENANT_SHARED_SECRET:-}
+      LOG_LEVEL: ${SC_LOG_LEVEL:-info}
+    volumes:
+      - sc_creds:/data
     restart: unless-stopped
 
   frontend:
@@ -70,3 +82,4 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  sc_creds:

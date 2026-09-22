@@ -1,11 +1,16 @@
 import { apiClient } from "./client";
 
 /**
- * SchoolConnect-Integration (v0.1.0, "schoolconnect serve").
+ * SchoolConnect-Integration (v0.3.0 Multi-Tenant, "schoolconnect serve"
+ * als Sidecar mit SC_REQUIRE_TENANT=true).
  *
  * Das SmartTable-Backend proxied lesende Plugin-Funktionen unter
  * `/api/v1/integrations/schoolconnect/...` — hier liegen nur die
  * Frontend-Typen + Mapping-Hilfen auf die SmartTable-Formate.
+ *
+ * Mandanten-Trennung: Das Backend setzt X-SC-Tenant aus der JWT-user_id —
+ * jeder App-Benutzer hat eigene SchoolConnect-Credentials + Sessions
+ * (pro Benutzer isoliert, Logout trifft nur die eigene Session).
  */
 
 export type SchoolConnectPluginId =

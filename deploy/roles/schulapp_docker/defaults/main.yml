@@ -1,3 +1,9 @@
 schulapp_project_dir: /opt/schulapp/docker
 schulapp_env_file: /opt/schulapp/.env
 frontend_repo_src: "{{ playbook_dir }}/../../apps/codeclub-ui"
+backend_repo_src: "{{ playbook_dir }}/../../apps/schulapp-backend"
+schoolconnect_repo_src: "{{ playbook_dir }}/../../apps/schoolconnect"
+# Optional: HMAC-Secret für X-SC-Tenant-Signatur (muss auf Backend- und
+# Sidecar-Seite identisch sein). Leer = keine Signatur.
+sc_tenant_shared_secret: ""
+sc_log_level: "info"

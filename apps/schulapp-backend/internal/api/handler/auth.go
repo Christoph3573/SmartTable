@@ -30,10 +30,10 @@ type Server struct {
 	UploadDir       string
 	Hub             *ws.Hub
 	// SchoolConnectBaseURL ist die Adresse der SchoolConnect-REST-API
-	// ("schoolconnect serve", v0.1.0). Env SCHOOLCONNECT_BASE_URL
-	// schlägt dieses Feld; Default ist http://host.docker.internal:8081
-	// (Host aus dem Backend-Container via host-gateway, siehe
-	// deploy/roles/schulapp_docker/templates/docker-compose.yml.j2).
+	// (Sidecar-Service "schoolconnect", v0.3.0 Multi-Tenant). Env
+	// SCHOOLCONNECT_BASE_URL schlägt dieses Feld; Default ist
+	// http://schoolconnect:8081 (internes Compose-Netz, siehe
+	// docker-compose.yml bzw. deploy docker-compose.yml.j2).
 	SchoolConnectBaseURL string
 }
 
