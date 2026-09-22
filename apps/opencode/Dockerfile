@@ -1,7 +1,12 @@
 # OpenCode-Sidecar (KI-Lernchat, Agent-Runtime).
 # Lädt das Release-Binary für die Build-Architektur (linux/arm64 = Pi,
-# linux/amd64 = Standard-Server, jeweils .tar.gz mit Binary `opencode`)
+# linux/amd64 = Standard-Server, jeweils *-musl.tar.gz mit Binary `opencode`)
 # und startet `opencode serve --hostname 0.0.0.0 --port 8082`.
+#
+# WICHTIG: musl-Variante nehmen — Alpine hat kein glibc, das normale
+# opencode-linux-{arm64,x64}.tar.gz startet dort nicht (exit 127, fehlender
+# ld-linux-Loader). Die musl-Binaries linken gegen /lib/ld-musl-* und
+# laufen auf Alpine nativ (verifiziert: file → ARM aarch64 + x86-64 musl).
 #
 # Multi-Tenancy: EIN gemeinsamer Service für alle User. Das Go-Backend ist
 # die Security-Grenze — es legt pro User einen Workspace
@@ -22,7 +27,7 @@ ARG TARGETARCH
 RUN apk add --no-cache ca-certificates wget tar && \
     if [ "$TARGETARCH" = "arm64" ]; then OC_ARCH="arm64"; else OC_ARCH="x64"; fi && \
     wget -O /tmp/opencode.tar.gz \
-      "https://github.com/anomalyco/opencode/releases/download/${OPENCODE_VERSION}/opencode-linux-${OC_ARCH}.tar.gz" && \
+      "https://github.com/anomalyco/opencode/releases/download/${OPENCODE_VERSION}/opencode-linux-${OC_ARCH}-musl.tar.gz" && \
     tar xzf /tmp/opencode.tar.gz -C /usr/local/bin && \
     rm /tmp/opencode.tar.gz && \
     chmod +x /usr/local/bin/opencode && \
