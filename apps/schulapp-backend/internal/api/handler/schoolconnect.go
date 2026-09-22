@@ -45,8 +45,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/go-chi/chi/v5"
 )
 
 const schoolConnectDefaultBaseURL = "http://schoolconnect:8081"
@@ -176,7 +174,7 @@ func schoolConnectUnreachable(w http.ResponseWriter) {
 // "nicht konfiguriert" und "Fehler" unterscheiden und eine
 // Setup-Anleitung zeigen kann. Der tenantlose /api-Index ist in
 // SchoolConnect bewusst frei (kein Tenant nötig).
-func (h *Server) HandleSchoolConnectStatus(w http.ResponseWriter, r *http.Request) {
+func (h *Server) GetApiV1IntegrationsSchoolconnectStatus(w http.ResponseWriter, r *http.Request) {
 	if h.claims(w, r) == nil {
 		return
 	}
@@ -230,16 +228,15 @@ func (h *Server) HandleSchoolConnectStatus(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-// HandleSchoolConnectAuth leitet einen Login an SchoolConnect weiter
-// (POST /api/{plugin}/auth, mit X-SC-Tenant aus der JWT-user_id —
-// pro App-Benutzer isoliert). Antwort enthält nie Secret-Werte,
+// PostApiV1IntegrationsSchoolconnectPluginAuth leitet einen Login an
+// SchoolConnect weiter (POST /api/{plugin}/auth, mit X-SC-Tenant aus der
+// JWT-user_id — pro App-Benutzer isoliert). Antwort enthält nie Secret-Werte,
 // nur Key-Namen — das garantiert die SchoolConnect-Runtime.
-func (h *Server) HandleSchoolConnectAuth(w http.ResponseWriter, r *http.Request) {
+func (h *Server) PostApiV1IntegrationsSchoolconnectPluginAuth(w http.ResponseWriter, r *http.Request, plugin string) {
 	tenant := h.schoolConnectTenant(w, r)
 	if tenant == "" {
 		return
 	}
-	plugin := chi.URLParam(r, "plugin")
 	if !scAuthPlugins[plugin] {
 		writeError(w, http.StatusBadRequest, "Plugin "+plugin+" braucht keine Anmeldung")
 		return
@@ -259,14 +256,14 @@ func (h *Server) HandleSchoolConnectAuth(w http.ResponseWriter, r *http.Request)
 	w.Write(raw)
 }
 
-// HandleSchoolConnectLogout verwirft die SchoolConnect-Session
-// (POST /api/{plugin}/logout, nur die eigene Tenant-Session).
-func (h *Server) HandleSchoolConnectLogout(w http.ResponseWriter, r *http.Request) {
+// PostApiV1IntegrationsSchoolconnectPluginLogout verwirft die
+// SchoolConnect-Session (POST /api/{plugin}/logout, nur die eigene
+// Tenant-Session).
+func (h *Server) PostApiV1IntegrationsSchoolconnectPluginLogout(w http.ResponseWriter, r *http.Request, plugin string) {
 	tenant := h.schoolConnectTenant(w, r)
 	if tenant == "" {
 		return
 	}
-	plugin := chi.URLParam(r, "plugin")
 	if !scAuthPlugins[plugin] {
 		writeError(w, http.StatusBadRequest, "Plugin "+plugin+" braucht keine Anmeldung")
 		return
@@ -281,18 +278,28 @@ func (h *Server) HandleSchoolConnectLogout(w http.ResponseWriter, r *http.Reques
 	w.Write(raw)
 }
 
-// HandleSchoolConnectCall proxied eine lesende Plugin-Funktion:
-// GET-Query bzw. POST-JSON-Body werden 1:1 an SchoolConnect gereicht
-// (mit X-SC-Tenant aus der JWT-user_id — pro App-Benutzer isoliert),
-// Antwort (Result-Envelope {plugin, function, data}) kommt unverändert zurück.
-// Lernplan-Bayern (öffentlich, kein Login) wird tenantlos gefragt.
-func (h *Server) HandleSchoolConnectCall(w http.ResponseWriter, r *http.Request) {
+// GetApiV1IntegrationsSchoolconnectPluginFunction proxied eine lesende
+// Plugin-Funktion (GET, Query-Params werden gereicht).
+func (h *Server) GetApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request, plugin string, function string) {
+	h.schoolConnectCall(w, r, plugin, function)
+}
+
+// PostApiV1IntegrationsSchoolconnectPluginFunction proxied eine lesende
+// Plugin-Funktion (POST, JSON-Body wird gereicht).
+func (h *Server) PostApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request, plugin string, function string) {
+	h.schoolConnectCall(w, r, plugin, function)
+}
+
+// schoolConnectCall proxied eine lesende Plugin-Funktion: GET-Query bzw.
+// POST-JSON-Body werden 1:1 an SchoolConnect gereicht (mit X-SC-Tenant aus
+// der JWT-user_id — pro App-Benutzer isoliert), Antwort (Result-Envelope
+// {plugin, function, data}) kommt unverändert zurück. Lernplan-Bayern
+// (öffentlich, kein Login) wird tenantlos gefragt.
+func (h *Server) schoolConnectCall(w http.ResponseWriter, r *http.Request, plugin, function string) {
 	tenant := h.schoolConnectTenant(w, r)
 	if tenant == "" {
 		return
 	}
-	plugin := chi.URLParam(r, "plugin")
-	function := chi.URLParam(r, "function")
 	allowed, ok := scAllowedCalls[plugin]
 	if !ok || !allowed[function] {
 		writeError(w, http.StatusNotFound, "Funktion "+plugin+"/"+function+" ist nicht freigegeben")

@@ -137,15 +137,9 @@ func main() {
 	})
 
 	// SchoolConnect-Integration (v0.3.0-Proxy, Multi-Tenant-Sidecar):
-	// eigenes Auth (JWT) bleibt davor — der Proxy setzt X-SC-Tenant aus
-	// der JWT-user_id und erreicht das SchoolConnect-REST via Server-Netz.
-	r.Route("/api/v1/integrations/schoolconnect", func(r chi.Router) {
-		r.Get("/status", srv.HandleSchoolConnectStatus)
-		r.Post("/{plugin}/auth", srv.HandleSchoolConnectAuth)
-		r.Post("/{plugin}/logout", srv.HandleSchoolConnectLogout)
-		r.Get("/{plugin}/{function}", srv.HandleSchoolConnectCall)
-		r.Post("/{plugin}/{function}", srv.HandleSchoolConnectCall)
-	})
+	// läuft über den OpenAPI-Router (ServerInterface, JWT-Check im Handler)
+	// — der Proxy setzt X-SC-Tenant aus der JWT-user_id und erreicht das
+	// SchoolConnect-REST via Server-Netz.
 
 	api.HandlerWithOptions(srv, api.ChiServerOptions{
 		BaseRouter: r,
