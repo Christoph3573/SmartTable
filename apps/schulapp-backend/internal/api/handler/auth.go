@@ -47,7 +47,7 @@ type Server struct {
 	OpenCodeWorkspaceRoot string
 	// OpenCodeModel ist das Default-Modell für neue Lernchat-Sessions
 	// (OpenRouter-ID im Format provider/modell, z. B.
-	// openrouter/deepseek-v4.1-flash). Env OPENCODE_MODEL schlägt dieses
+	// openrouter/deepseek/deepseek-v4.1-flash). Env OPENCODE_MODEL schlägt dieses
 	// Feld; Default siehe openCodeDefaultModel in opencode.go. Das Backend
 	// gibt es bei jeder Nachricht an POST /session/{id}/message mit.
 	OpenCodeModel string

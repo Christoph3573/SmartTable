@@ -116,7 +116,7 @@ func main() {
 		// Default-Modell für neue Lernchat-Sessions (OpenRouter-ID
 		// provider/modell); das Backend gibt es pro Nachricht an
 		// POST /session/{id}/message mit (Feld `model`).
-		OpenCodeModel: envOrDefault("OPENCODE_MODEL", "openrouter/deepseek-v4.1-flash"),
+		OpenCodeModel: envOrDefault("OPENCODE_MODEL", "openrouter/deepseek/deepseek-v4.1-flash"),
 	}
 
 	r.Get("/ws", srv.HandleWS)

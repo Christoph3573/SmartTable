@@ -58,7 +58,7 @@ const openCodeDefaultBaseURL = "http://opencode:8082"
 // (OpenRouter-ID im Format provider/modell). Env OPENCODE_MODEL schlägt
 // den Default; die Session-Antwort von POST /session enthält provider+model
 // und wird in opencode_sessions gespeichert.
-const openCodeDefaultModel = "openrouter/deepseek-v4.1-flash"
+const openCodeDefaultModel = "openrouter/deepseek/deepseek-v4.1-flash"
 
 const openCodeHint = "OpenCode-Service prüfen: läuft als Compose-Service " +
 	"`opencode` (intern http://opencode:8082, kein Host-Port, `opencode serve " +
@@ -110,8 +110,8 @@ func (h *Server) openCodeBase() string {
 
 // openCodeModel liefert das Default-Modell (ohne Leerzeichen). Env
 // OPENCODE_MODEL schlägt Server-Feld; Default ist
-// openrouter/deepseek-v4.1-flash. Format provider/modell (z. B.
-// openrouter/deepseek-v4.1-flash) — das Backend splittet beim Senden an
+// openrouter/deepseek/deepseek-v4.1-flash. Format provider/modell (z. B.
+// openrouter/deepseek/deepseek-v4.1-flash) — das Backend splittet beim Senden an
 // POST /session/{id}/message in {providerID, modelID}.
 func (h *Server) openCodeModel() string {
 	model := h.OpenCodeModel

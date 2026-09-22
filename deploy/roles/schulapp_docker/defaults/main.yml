@@ -10,11 +10,11 @@ sc_tenant_shared_secret: ""
 sc_log_level: "info"
 # OpenCode (KI-Lernchat): Release-Version + Modell-Key (global für alle
 # Tenant-Sessions) + Default-Modell (OpenRouter-ID
-# openrouter/deepseek-v4.1-flash). Der Key kommt im CI aus dem GitHub
+# openrouter/deepseek/deepseek-v4.1-flash). Der Key kommt im CI aus dem GitHub
 # Secret OPENROUTER_API_KEY (als Env gesetzt, via lookup('env', ...)
 # gelesen — nie als -e auf der Kommandozeile, damit er nicht in `ps`
 # auftaucht); lokal als Host-Var/Vault openrouter_api_key setzen, sonst
 # bleibt der Chat im lokalen Modus.
 opencode_version: "v1.18.32"
 openrouter_api_key: "{{ lookup('env', 'OPENROUTER_API_KEY') }}"
-opencode_model: "openrouter/deepseek-v4.1-flash"
+opencode_model: "openrouter/deepseek/deepseek-v4.1-flash"

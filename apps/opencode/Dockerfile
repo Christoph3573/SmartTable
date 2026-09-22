@@ -25,7 +25,7 @@
 # kommt als Env aus .env (im CI aus dem GitHub Secret OPENROUTER_API_KEY) —
 # der Container nutzt ihn global für alle Tenant-Sessions.
 # OPENCODE_VERSION pinnt das Release. Das Default-Modell
-# (openrouter/deepseek-v4.1-flash — verifiziert in models.dev:
+# (openrouter/deepseek/deepseek-v4.1-flash — verifiziert in models.dev:
 # tool_call=true, 1M Kontext) steht in der mit kopierten opencode.json
 # (`model`-Key) und gilt für alle Tenant-Sessions; das Backend gibt es
 # zusätzlich pro Nachricht mit (Feld `model`, Env OPENCODE_MODEL).

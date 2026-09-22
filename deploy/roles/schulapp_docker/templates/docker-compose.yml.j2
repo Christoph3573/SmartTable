@@ -52,7 +52,7 @@ services:
       OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-http://opencode:8082}
       OPENCODE_WORKSPACE_ROOT: /workspaces
       OPENCODE_MCP_URL: http://backend:8080/api/v1/mcp
-      OPENCODE_MODEL: ${OPENCODE_MODEL:-openrouter/deepseek-v4.1-flash}
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-openrouter/deepseek/deepseek-v4.1-flash}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -96,6 +96,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     volumes:
       - workspaces:/workspaces
+      - opencode_data:/root/.local/share/opencode
     restart: unless-stopped
 
   frontend:
@@ -114,3 +115,4 @@ volumes:
   uploads_data:
   sc_creds:
   workspaces:
+  opencode_data:
