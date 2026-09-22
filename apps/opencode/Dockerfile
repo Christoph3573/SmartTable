@@ -1,12 +1,17 @@
 # OpenCode-Sidecar (KI-Lernchat, Agent-Runtime).
 # Lädt das Release-Binary für die Build-Architektur (linux/arm64 = Pi,
-# linux/amd64 = Standard-Server, jeweils *-musl.tar.gz mit Binary `opencode`)
+# linux/amd64 = Standard-Server, jeweils .tar.gz mit Binary `opencode`)
 # und startet `opencode serve --hostname 0.0.0.0 --port 8082`.
 #
-# WICHTIG: musl-Variante nehmen — Alpine hat kein glibc, das normale
-# opencode-linux-{arm64,x64}.tar.gz startet dort nicht (exit 127, fehlender
-# ld-linux-Loader). Die musl-Binaries linken gegen /lib/ld-musl-* und
-# laufen auf Alpine nativ (verifiziert: file → ARM aarch64 + x86-64 musl).
+# Basis: debian-slim — das Standard-Release-Binary ist gegen glibc
+# gelinkt (Interpreter /lib/ld-linux-*, verifiziert via `file`), auf
+# Alpine (musl) startet es nicht (exit 127).
+#
+# Arch-Erkennung via `uname -m` (nicht via $TARGETARCH): TARGETARCH ist
+# ein BuildKit-Builtin und ist beim klassischen Builder auf dem Pi leer —
+# dann wurde immer das x64-Binary geladen, auf ARM also falsche Arch
+# (exec format → exit 127 beim `--version`-Check). `uname -m` greift
+# immer, TARGETARCH bleibt nur als Fallback.
 #
 # Multi-Tenancy: EIN gemeinsamer Service für alle User. Das Go-Backend ist
 # die Security-Grenze — es legt pro User einen Workspace
@@ -19,15 +24,18 @@
 # Modell-Credentials: OPENROUTER_API_KEY (oder ein anderer Provider-Key)
 # kommt als Env aus .env/Ansible-Vault — der Container nutzt ihn global
 # für alle Tenant-Sessions. OPENCODE_VERSION pinnt das Release.
-FROM alpine:3.21
+FROM debian:12-slim
 
 ARG OPENCODE_VERSION=v1.18.32
 ARG TARGETARCH
 
-RUN apk add --no-cache ca-certificates wget tar && \
-    if [ "$TARGETARCH" = "arm64" ]; then OC_ARCH="arm64"; else OC_ARCH="x64"; fi && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget tar && \
+    rm -rf /var/lib/apt/lists && \
+    MACHINE="$(uname -m)" && \
+    if [ "$MACHINE" = "aarch64" ] || [ "$TARGETARCH" = "arm64" ]; then OC_ARCH="arm64"; else OC_ARCH="x64"; fi && \
+    echo "Downloading opencode ${OPENCODE_VERSION} for linux/${OC_ARCH} (uname -m=${MACHINE}, TARGETARCH=${TARGETARCH})" && \
     wget -O /tmp/opencode.tar.gz \
-      "https://github.com/anomalyco/opencode/releases/download/${OPENCODE_VERSION}/opencode-linux-${OC_ARCH}-musl.tar.gz" && \
+      "https://github.com/anomalyco/opencode/releases/download/${OPENCODE_VERSION}/opencode-linux-${OC_ARCH}.tar.gz" && \
     tar xzf /tmp/opencode.tar.gz -C /usr/local/bin && \
     rm /tmp/opencode.tar.gz && \
     chmod +x /usr/local/bin/opencode && \
