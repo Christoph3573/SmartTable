@@ -5,6 +5,7 @@ import type { components } from "../../api/generated/types";
 import { useAuthStore } from "../../store/authStore";
 import { Button } from "../../components/ui/Button";
 import { EmptyState, PageHeader } from "../../components/ui/Page";
+import { Markdown } from "../../components/ui/Markdown";
 import { formatDate } from "../../lib/format";
 
 type OpenCodeSession = components["schemas"]["OpenCodeSession"];
@@ -332,7 +333,14 @@ export function AiChatPage() {
                         : "rounded-bl-sm bg-white text-gray-800 shadow-sm ring-1 ring-gray-200"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                    {own ? (
+                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                    ) : (
+                      <Markdown
+                        content={message.content}
+                        className="break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                      />
+                    )}
                     <time className={`mt-1.5 block text-[.65rem] ${own ? "text-indigo-100" : "text-gray-400"}`}>
                       {formatDate(message.created_at, { hour: "2-digit", minute: "2-digit" })}
                     </time>
