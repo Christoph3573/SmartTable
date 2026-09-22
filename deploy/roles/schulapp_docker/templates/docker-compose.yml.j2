@@ -45,13 +45,23 @@ services:
       # SC_TENANT_SHARED_SECRET (muss zum Sidecar passen).
       SCHOOLCONNECT_BASE_URL: ${SCHOOLCONNECT_BASE_URL:-http://schoolconnect:8081}
       SC_TENANT_SHARED_SECRET: ${SC_TENANT_SHARED_SECRET:-}
+      # OpenCode (KI-Lernchat, Agent-Runtime): gemeinsamer Sidecar-Service
+      # für alle User (nur internes Netz). Tenant-Trennung via
+      # /workspaces/<user_id> + Ownership-Checks im Backend (JWT-Grenze).
+      # MCP-URL aus Sicht des opencode-Containers (Compose-Netz).
+      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-http://opencode:8082}
+      OPENCODE_WORKSPACE_ROOT: /workspaces
+      OPENCODE_MCP_URL: http://backend:8080/api/v1/mcp
     depends_on:
       migrate:
         condition: service_completed_successfully
       schoolconnect:
         condition: service_started
+      opencode:
+        condition: service_started
     volumes:
       - uploads_data:/app/uploads
+      - workspaces:/workspaces:ro
     restart: unless-stopped
 
   # SchoolConnect v0.3.0 Multi-Tenant als Sidecar: nur internes Netz
@@ -68,20 +78,23 @@ services:
       - sc_creds:/data
     restart: unless-stopped
 
-  # KI-Lernchat (spaeter): `opencode serve` als eigener Sidecar, nur
-  # internes Netz (kein ports:). Das Backend proxied
-  # POST /api/v1/integrations/opencode/chat dorthin (Tenant = JWT-user_id).
-  # Noch nicht aktiv — erst einkommentieren, wenn der opencode-Service
-  # steht und der Backend-Proxy verdrahtet ist (+ schoolconnect_repo_src-
-  # analoge Sync-Variable ergaenzen).
-  # opencode:
-  #   build:
-  #     context: ./opencode
-  #   environment:
-  #     OPENCODE_ADDR: ":8082"
-  #   volumes:
-  #     - opencode_data:/data
-  #   restart: unless-stopped
+  # OpenCode (KI-Lernchat, Agent-Runtime): gemeinsamer Sidecar-Service
+  # für alle User, nur internes Netz (kein ports:). Tenant-Trennung:
+  # Backend ruft die REST-API mit ?directory=/workspaces/<user_id> auf
+  # (directory-scoped, pro User isoliert) und prüft Ownership in
+  # opencode_sessions. Modell-Key global via OPENROUTER_API_KEY (aus .env).
+  # Der Browser spricht NIE direkt mit diesem Service (JWT-Grenze=Backend).
+  opencode:
+    build:
+      context: ./opencode
+      args:
+        OPENCODE_VERSION: ${OPENCODE_VERSION:-v1.18.32}
+    environment:
+      OPENCODE_PORT: "8082"
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    volumes:
+      - workspaces:/workspaces
+    restart: unless-stopped
 
   frontend:
     build:
@@ -98,4 +111,4 @@ volumes:
   postgres_data:
   uploads_data:
   sc_creds:
-  # opencode_data:  # aktivieren zusammen mit dem opencode-Service oben
+  workspaces:

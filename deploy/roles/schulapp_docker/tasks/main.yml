@@ -120,6 +120,15 @@
     delete: true
   become: false
 
+- name: OpenCode-Sidecar-Quellcode kopieren (für Docker-Build)
+  ansible.posix.synchronize:
+    src: "{{ opencode_repo_src }}/"
+    dest: "{{ schulapp_project_dir }}/opencode/"
+    rsync_opts:
+      - "--exclude=.git"
+    delete: true
+  become: false
+
 - name: Alte exited Container aufräumen (migrate-Container etc.)
   ansible.builtin.command: docker container prune -f
 

@@ -28,6 +28,8 @@ export type UpdateVocabSetInput = components["schemas"]["UpdateVocabSetRequest"]
 export type VocabCard = components["schemas"]["VocabCard"];
 export type CreateVocabCardInput = components["schemas"]["CreateVocabCardRequest"];
 export type UpdateVocabCardInput = components["schemas"]["UpdateVocabCardRequest"];
+export type OpenCodeSession = components["schemas"]["OpenCodeSession"];
+export type OpenCodeMessage = components["schemas"]["OpenCodeMessage"];
 
 export type EventInput = components["schemas"]["CreateEventRequest"];
 export type UpdateEventInput = components["schemas"]["UpdateEventRequest"];
@@ -182,4 +184,17 @@ export const schoolApi = {
   deleteVocabCard: (id: number) => apiClient.delete(`/api/v1/vocab/cards/${id}`),
   gradeVocabCard: (id: number, known: boolean) =>
     apiClient.post<VocabCard>(`/api/v1/vocab/cards/${id}/grade`, { known }).then((r) => r.data),
+
+  // KI-Lernchat (OpenCode hinter dem Backend — niemals direkt zum Sidecar).
+  opencodeStatus: () =>
+    apiClient.get<{ configured: boolean; reachable: boolean }>("/api/v1/integrations/opencode/status").then((r) => r.data),
+  opencodeSessions: () =>
+    apiClient.get<OpenCodeSession[]>("/api/v1/integrations/opencode/sessions").then((r) => r.data),
+  createOpencodeSession: (title?: string) =>
+    apiClient.post<OpenCodeSession>("/api/v1/integrations/opencode/sessions", { title }).then((r) => r.data),
+  opencodeHistory: (id: number) =>
+    apiClient.get<OpenCodeMessage[]>(`/api/v1/integrations/opencode/sessions/${id}`).then((r) => r.data),
+  sendOpencodeMessage: (id: number, content: string) =>
+    apiClient.post<OpenCodeMessage[]>(`/api/v1/integrations/opencode/sessions/${id}/messages`, { content }).then((r) => r.data),
+  deleteOpencodeSession: (id: number) => apiClient.delete(`/api/v1/integrations/opencode/sessions/${id}`),
 };

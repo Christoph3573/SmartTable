@@ -790,6 +790,69 @@ components:
         requested_class_id:
           type: integer
 
+    OpenCodeSession:
+      type: object
+      required: [id, title, workspace, message_count, created_at]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        workspace:
+          type: string
+        model_provider:
+          type: string
+        model_id:
+          type: string
+        message_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    CreateOpenCodeSessionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+
+    OpenCodeMessage:
+      type: object
+      required: [id, role, content, created_at]
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        tokens:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    SendOpenCodeMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+
+    OpenCodeStatus:
+      type: object
+      required: [configured, reachable]
+      properties:
+        configured:
+          type: boolean
+        reachable:
+          type: boolean
+        base_url:
+          type: string
+        hint:
+          type: string
+
     JoinRequest:
       type: object
       required: [id, class_id, student_id, status]
@@ -2375,6 +2438,118 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VocabCard"
+
+  /api/v1/integrations/opencode/status:
+    get:
+      tags: [integrations]
+      summary: OpenCode-Status (Erreichbarkeit des Sidecar-Services)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Status mit reachable-Flag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenCodeStatus"
+
+  /api/v1/integrations/opencode/sessions:
+    get:
+      tags: [integrations]
+      summary: Eigene OpenCode-Chat-Sessions auflisten
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sessions des authentifizierten Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenCodeSession"
+    post:
+      tags: [integrations]
+      summary: Neue OpenCode-Chat-Session anlegen (eigener Tenant-Workspace)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpenCodeSessionRequest"
+      responses:
+        "201":
+          description: Session angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenCodeSession"
+
+  /api/v1/integrations/opencode/sessions/{id}:
+    get:
+      tags: [integrations]
+      summary: Session mit Nachrichtenverlauf abrufen (nur Owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Verlauf (älteste zuerst)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenCodeMessage"
+    delete:
+      tags: [integrations]
+      summary: Session löschen (nur Owner, inkl. Verlauf)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Session gelöscht
+
+  /api/v1/integrations/opencode/sessions/{id}/messages:
+    post:
+      tags: [integrations]
+      summary: Nachricht an OpenCode senden (Antwort kommt vollständig + per WebSocket-Event)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendOpenCodeMessageRequest"
+      responses:
+        "201":
+          description: User-Nachricht + Agent-Antwort (Antwort vollständig)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenCodeMessage"
 
   /api/v1/integrations/schoolconnect/status:
     get:

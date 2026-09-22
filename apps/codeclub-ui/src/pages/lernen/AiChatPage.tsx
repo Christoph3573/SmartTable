@@ -1,79 +1,163 @@
 import { useEffect, useRef, useState } from "react";
 import { apiClient } from "../../api/client";
 import { schoolApi } from "../../api/school";
+import type { components } from "../../api/generated/types";
 import { useAuthStore } from "../../store/authStore";
 import { Button } from "../../components/ui/Button";
 import { EmptyState, PageHeader } from "../../components/ui/Page";
 import { formatDate } from "../../lib/format";
 
-type AiMessage = {
+type OpenCodeSession = components["schemas"]["OpenCodeSession"];
+type OpenCodeMessage = components["schemas"]["OpenCodeMessage"];
+type WsOpenCodeEvent = { type: "opencode"; session_id: number; message: OpenCodeMessage };
+
+type ChatBubble = {
   id: string;
   role: "user" | "assistant";
   content: string;
   created_at: string;
 };
 
-const STORAGE_KEY = "smarttable-ai-chat";
-const OPENCODE_URL_KEY = "smarttable-opencode-url";
-
-function loadMessages(): AiMessage[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as AiMessage[];
-    return Array.isArray(parsed) ? parsed.slice(-100) : [];
-  } catch {
-    return [];
-  }
-}
-
 /**
- * KI-Lernchat: schreibt gegen einen OpenAI-kompatiblen `opencode serve`
- * Sidecar (später eigener Compose-Service `opencode`, nur internes Netz,
- * erreichbar via Backend-Proxy POST /api/v1/integrations/opencode/chat).
+ * KI-Lernchat: Der Browser spricht ausschließlich mit dem Go-Backend
+ * (POST/GET/DELETE /api/v1/integrations/opencode/sessions...), niemals
+ * direkt mit `opencode serve`. Das Backend ist die Multi-Tenant-Grenze
+ * (eigener Workspace /workspaces/<user_id> pro User, Ownership-Checks,
+ * Schuldaten nur über Backend-MCP-Tools).
  *
- * Stand jetzt: Der Sidecar läuft noch nicht — die Seite zeigt den
- * Verbindungsstatus, speichert den Verlauf lokal und antwortet mit einer
- * lokalen Lernhilfe (fällige Vokabeln + offene Hausaufgaben), bis das
- * opencode-Backend verdrahtet ist.
+ * Ablauf: Session wählen/anlegen → Verlauf laden → Nachricht senden →
+ * Backend fragt OpenCode (vollständige Antwort, kein Token-Streaming) und
+ * pusht sie zusätzlich als WebSocket-Event (type "opencode").
+ * Ist OpenCode offline, antwortet die Seite lokal (fällige Vokabeln +
+ * offene Hausaufgaben).
  */
 export function AiChatPage() {
   const user = useAuthStore((s) => s.user);
-  const [messages, setMessages] = useState<AiMessage[]>(loadMessages);
+  const [sessions, setSessions] = useState<OpenCodeSession[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [backendState, setBackendState] = useState<"checking" | "online" | "offline">("checking");
-  const [opencodeUrl, setOpencodeUrl] = useState(
-    () => localStorage.getItem(OPENCODE_URL_KEY) ?? "http://opencode:8082"
-  );
-  const [showSettings, setShowSettings] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const activeSession = sessions.find((s) => s.id === activeId) ?? null;
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-100)));
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const refreshStatus = () =>
     apiClient
       .get("/api/v1/integrations/opencode/status")
-      .then(() => !cancelled && setBackendState("online"))
-      .catch(() => !cancelled && setBackendState("offline"));
-    return () => {
-      cancelled = true;
-    };
+      .then((res) => setBackendState(res.data?.reachable ? "online" : "offline"))
+      .catch(() => setBackendState("offline"));
+
+  const refreshSessions = () =>
+    apiClient
+      .get<OpenCodeSession[]>("/api/v1/integrations/opencode/sessions")
+      .then((res) => {
+        setSessions(res.data);
+        setActiveId((prev) => {
+          if (prev !== null && res.data.some((s) => s.id === prev)) return prev;
+          return res.data[0]?.id ?? null;
+        });
+      })
+      .catch(() => {});
+
+  useEffect(() => {
+    refreshStatus();
+    refreshSessions();
+    const timer = setInterval(refreshStatus, 30000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const push = (role: AiMessage["role"], content: string) =>
+  // Verlauf laden bei Session-Wechsel.
+  useEffect(() => {
+    if (activeId === null) {
+      setMessages([]);
+      return;
+    }
+    setLoadingHistory(true);
+    apiClient
+      .get<OpenCodeMessage[]>(`/api/v1/integrations/opencode/sessions/${activeId}`)
+      .then((res) =>
+        setMessages(
+          res.data.map((m) => ({
+            id: String(m.id),
+            role: m.role,
+            content: m.content,
+            created_at: m.created_at,
+          }))
+        )
+      )
+      .catch(() => setMessages([]))
+      .finally(() => setLoadingHistory(false));
+  }, [activeId]);
+
+  // WebSocket-Events (type "opencode") der aktiven Session einpflegen —
+  // z. B. wenn die Antwort über einen anderen Tab ausgelöst wurde.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      let payload: WsOpenCodeEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (payload?.type !== "opencode" || payload.session_id !== activeId || !payload.message) return;
+      const incoming: ChatBubble = {
+        id: String(payload.message.id),
+        role: payload.message.role,
+        content: payload.message.content,
+        created_at: payload.message.created_at,
+      };
+      setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
+    };
+    // Der globale Chat-Socket (useChatSocket) hält die WS-Verbindung; hier
+    // wird zusätzlich auf Nachrichten-Ebene gelauscht, sobald der Browser
+    // eine eigene Verbindung braucht (Fallback-Polling deckt den Rest ab).
+    window.addEventListener("smarttable:opencode", onMessage as EventListener);
+    return () => window.removeEventListener("smarttable:opencode", onMessage as EventListener);
+  }, [activeId]);
+
+  // Fallback-Polling: Verlauf alle 5s nachladen, solange gesendet wird oder
+  // die Seite frisch geöffnet ist (deckt Antworten ohne WS-Event ab).
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (activeId === null) return;
+    pollRef.current = setInterval(() => {
+      if (document.hidden) return;
+      apiClient
+        .get<OpenCodeMessage[]>(`/api/v1/integrations/opencode/sessions/${activeId}`)
+        .then((res) =>
+          setMessages((prev) => {
+            const known = new Set(prev.map((m) => m.id));
+            const fresh = res.data
+              .filter((m) => !known.has(String(m.id)))
+              .map((m) => ({ id: String(m.id), role: m.role, content: m.content, created_at: m.created_at }));
+            return fresh.length ? [...prev, ...fresh] : prev;
+          })
+        )
+        .catch(() => {});
+    }, 5000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [activeId]);
+
+  const push = (role: ChatBubble["role"], content: string) =>
     setMessages((prev) => [
       ...prev,
       { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, role, content, created_at: new Date().toISOString() },
     ]);
 
   const localAnswer = async (question: string): Promise<string> => {
-    // Lokale Lernhilfe als Überbrückung: fällige Vokabeln + offene
-    // Hausaufgaben der ersten Klasse zusammenfassen.
+    // Lokale Lernhilfe als Überbrückung, solange OpenCode offline ist:
+    // fällige Vokabeln + offene Hausaufgaben der ersten Klasse zusammenfassen.
     const q = question.toLowerCase();
     try {
       const sets = await schoolApi.vocabSets();
@@ -95,7 +179,7 @@ export function AiChatPage() {
         const next = homework.slice().sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
         return `Nächste Aufgabe: „${next.title}" (fällig ${next.due_date})${next.description ? ` — ${next.description}` : ""}. Sag mir, wobei du festhängst, dann gehen wir es Schritt für Schritt durch.`;
       }
-      return `Gute Frage! Das opencode-Backend ist noch nicht verdrahtet (Status: ${backendState === "online" ? "online" : "offline"}), deshalb antworte ich lokal: ` +
+      return "Das opencode-Backend ist gerade offline, deshalb antworte ich lokal: " +
         (dueTotal > 0
           ? `Du hast ${dueTotal} fällige Vokabelkarten — starte am besten dort. `
           : "Deine Vokabeln sind auf Stand. ") +
@@ -105,24 +189,77 @@ export function AiChatPage() {
     }
   };
 
+  const createSession = async (): Promise<number | null> => {
+    try {
+      const res = await apiClient.post<OpenCodeSession>("/api/v1/integrations/opencode/sessions", {
+        title: "Lern-Chat",
+      });
+      setSessions((prev) => [res.data, ...prev]);
+      setActiveId(res.data.id);
+      setMessages([]);
+      setBackendState("online");
+      return res.data.id;
+    } catch {
+      await refreshStatus();
+      return null;
+    }
+  };
+
+  const deleteSession = async (id: number) => {
+    try {
+      await apiClient.delete(`/api/v1/integrations/opencode/sessions/${id}`);
+    } catch {
+      // Lokal trotzdem entfernen (z. B. Backend offline).
+    }
+    setSessions((prev) => {
+      const rest = prev.filter((s) => s.id !== id);
+      setActiveId((current) => (current === id ? (rest[0]?.id ?? null) : current));
+      return rest;
+    });
+    if (activeId === id) setMessages([]);
+  };
+
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
     const question = text.trim();
     if (!question || sending) return;
     setText("");
+    let sessionId = activeId;
+    if (sessionId === null) {
+      if (backendState === "online") {
+        sessionId = await createSession();
+        if (sessionId === null) {
+          push("user", question);
+          push("assistant", await localAnswer(question));
+          return;
+        }
+      } else {
+        push("user", question);
+        push("assistant", await localAnswer(question));
+        return;
+      }
+    }
     push("user", question);
     setSending(true);
     try {
-      if (backendState === "online") {
-        const res = await apiClient.post<{ reply: string }>("/api/v1/integrations/opencode/chat", {
-          message: question,
-          history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+      const res = await apiClient.post<OpenCodeMessage[]>(
+        `/api/v1/integrations/opencode/sessions/${sessionId}/messages`,
+        { content: question }
+      );
+      const reply = res.data.find((m) => m.role === "assistant");
+      if (reply) {
+        setMessages((prev) => {
+          const withoutOptimisticUser = prev.slice(0, -1);
+          const known = new Set(withoutOptimisticUser.map((m) => m.id));
+          const fresh = res.data
+            .filter((m) => !known.has(String(m.id)))
+            .map((m) => ({ id: String(m.id), role: m.role, content: m.content, created_at: m.created_at }));
+          return [...withoutOptimisticUser, ...fresh];
         });
-        push("assistant", res.data.reply);
-      } else {
-        push("assistant", await localAnswer(question));
       }
+      refreshSessions();
     } catch {
+      await refreshStatus();
       push("assistant", await localAnswer(question));
     } finally {
       setSending(false);
@@ -135,61 +272,47 @@ export function AiChatPage() {
         <span className={`pill ${backendState === "online" ? "blue" : "amber"}`}>
           {backendState === "checking" ? "Verbinde …" : backendState === "online" ? "opencode verbunden" : "Lokaler Modus"}
         </span>
-        <Button variant="secondary" onClick={() => setShowSettings((v) => !v)}>
-          {showSettings ? "Schließen" : "Anbindung"}
+        <Button variant="secondary" onClick={() => void createSession()}>
+          Neuer Chat
         </Button>
       </PageHeader>
 
-      {showSettings && (
-        <section className="surface mb-5 p-5">
-          <h2 className="mb-2">opencode-Anbindung (später)</h2>
-          <p className="mb-3 text-sm text-gray-500">
-            Der KI-Chat spricht später mit <code>opencode serve</code> als eigenem Compose-Service
-            (<code>opencode:8082</code>, nur internes Netz) über den Backend-Proxy
-            <code> POST /api/v1/integrations/opencode/chat</code>. Bis dahin läuft der lokale Modus.
-          </p>
-          <label className="block text-xs text-gray-600">
-            opencode-URL (wird gespeichert, aktuell nur Anzeige)
-            <input
-              className="mt-1 w-full max-w-md rounded-lg border border-gray-300 p-2 text-sm"
-              value={opencodeUrl}
-              onChange={(e) => {
-                setOpencodeUrl(e.target.value);
-                localStorage.setItem(OPENCODE_URL_KEY, e.target.value);
-              }}
-            />
-          </label>
-          <div className="mt-3 flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                setBackendState("checking");
-                apiClient
-                  .get("/api/v1/integrations/opencode/status")
-                  .then(() => setBackendState("online"))
-                  .catch(() => setBackendState("offline"));
-              }}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {sessions.map((session) => (
+          <span key={session.id} className={`pill cursor-pointer ${session.id === activeId ? "blue" : ""}`}>
+            <button
+              className="cursor-pointer"
+              onClick={() => setActiveId(session.id)}
+              title={`${session.message_count} Nachrichten · Workspace ${session.workspace}`}
             >
-              Verbindung prüfen
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setMessages([]);
-                localStorage.removeItem(STORAGE_KEY);
-              }}
+              {session.title} · {session.message_count}
+            </button>
+            <button
+              aria-label={`Chat ${session.title} löschen`}
+              className="ml-1 cursor-pointer opacity-60 hover:opacity-100"
+              onClick={() => void deleteSession(session.id)}
             >
-              Verlauf löschen
-            </Button>
-          </div>
-        </section>
-      )}
+              ×
+            </button>
+          </span>
+        ))}
+        {!sessions.length && backendState === "online" && (
+          <span className="text-sm text-gray-500">Noch keine Chats — lege mit „Neuer Chat“ einen an.</span>
+        )}
+        {!sessions.length && backendState !== "online" && (
+          <span className="text-sm text-gray-500">
+            OpenCode ist offline — deine Fragen werden lokal beantwortet (Vokabeln + Hausaufgaben).
+          </span>
+        )}
+      </div>
 
       <section className="surface flex min-h-[540px] flex-col overflow-hidden">
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-          {!messages.length ? (
+          {loadingHistory ? (
+            <div className="flex items-center gap-2 self-start text-sm text-gray-500">
+              <span className="loader" aria-hidden="true" /> Verlauf wird geladen …
+            </div>
+          ) : !messages.length ? (
             <EmptyState
               title={`Hallo ${user?.first_name ?? ""} — frag mich was!`}
               description="Z. B. „Welche Vokabeln sind fällig?“, „Was sind meine nächsten Hausaufgaben?“ oder „Erklär mir das Passiv im Englischen.“"
@@ -229,7 +352,7 @@ export function AiChatPage() {
           <input
             aria-label="Nachricht an die Lern-KI"
             className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Frag mich etwas zum Lernen …"
+            placeholder={activeSession ? `Nachricht an ${activeSession.title} …` : "Frag mich etwas zum Lernen …"}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -238,6 +361,10 @@ export function AiChatPage() {
           </Button>
         </form>
       </section>
+      <p className="mt-3 text-xs text-gray-500">
+        Sessions sind pro Benutzer isoliert (eigener Workspace auf dem Server). Die Lern-KI sieht Stundenplan,
+        Vertretungen, Hausaufgaben, LehrplanPLUS und Vokabeln — aber nur deine eigenen Daten.
+      </p>
     </div>
   );
 }

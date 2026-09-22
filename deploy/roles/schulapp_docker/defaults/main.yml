@@ -3,7 +3,12 @@ schulapp_env_file: /opt/schulapp/.env
 frontend_repo_src: "{{ playbook_dir }}/../../apps/codeclub-ui"
 backend_repo_src: "{{ playbook_dir }}/../../apps/schulapp-backend"
 schoolconnect_repo_src: "{{ playbook_dir }}/../../apps/schoolconnect"
+opencode_repo_src: "{{ playbook_dir }}/../../apps/opencode"
 # Optional: HMAC-Secret für X-SC-Tenant-Signatur (muss auf Backend- und
 # Sidecar-Seite identisch sein). Leer = keine Signatur.
 sc_tenant_shared_secret: ""
 sc_log_level: "info"
+# OpenCode (KI-Lernchat): Release-Version + Modell-Key (global für alle
+# Tenant-Sessions; als Host-Var/Vault setzen, sonst bleibt der Chat offline).
+opencode_version: "v1.18.32"
+openrouter_api_key: ""

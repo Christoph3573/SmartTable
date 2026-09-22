@@ -70,6 +70,8 @@ func resetDB(t *testing.T) {
 		homework_submissions, homework,
 		substitutions, events,
 		files, file_folders,
+		vocab_cards, vocab_sets,
+		opencode_messages, opencode_session_tokens, opencode_sessions,
 		class_join_requests, class_teachers, class_members,
 		refresh_tokens, classes, subjects, users, schools
 		RESTART IDENTITY CASCADE`)

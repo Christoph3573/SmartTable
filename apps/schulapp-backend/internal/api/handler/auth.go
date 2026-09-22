@@ -35,6 +35,16 @@ type Server struct {
 	// http://schoolconnect:8081 (internes Compose-Netz, siehe
 	// docker-compose.yml bzw. deploy docker-compose.yml.j2).
 	SchoolConnectBaseURL string
+	// OpenCodeBaseURL ist die Adresse von `opencode serve` (gemeinsamer
+	// Sidecar-Service "opencode" für alle User, nur internes Compose-Netz).
+	// Env OPENCODE_BASE_URL schlägt dieses Feld; Default ist
+	// http://opencode:8082. Die Multi-Tenant-Grenze bleibt das Backend:
+	// Workspaces /workspaces/<user_id> + Ownership-Checks (siehe opencode.go).
+	OpenCodeBaseURL string
+	// OpenCodeWorkspaceRoot ist das Root-Verzeichnis für Tenant-Workspaces
+	// (dasselbe Volume mountet der opencode-Container). Env
+	// OPENCODE_WORKSPACE_ROOT schlägt dieses Feld; Default /workspaces.
+	OpenCodeWorkspaceRoot string
 }
 
 func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {

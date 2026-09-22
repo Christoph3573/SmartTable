@@ -2478,6 +2478,202 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/opencode/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OpenCode-Status (Erreichbarkeit des Sidecar-Services) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Status mit reachable-Flag */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeStatus"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eigene OpenCode-Chat-Sessions auflisten */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Sessions des authentifizierten Users */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeSession"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Neue OpenCode-Chat-Session anlegen (eigener Tenant-Workspace) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateOpenCodeSessionRequest"];
+                };
+            };
+            responses: {
+                /** @description Session angelegt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeSession"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Session mit Nachrichtenverlauf abrufen (nur Owner) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Verlauf (älteste zuerst) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeMessage"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Session löschen (nur Owner, inkl. Verlauf) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Session gelöscht */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nachricht an OpenCode senden (Antwort kommt vollständig + per WebSocket-Event) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SendOpenCodeMessageRequest"];
+                };
+            };
+            responses: {
+                /** @description User-Nachricht + Agent-Antwort (Antwort vollständig) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeMessage"][];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integrations/schoolconnect/status": {
         parameters: {
             query?: never;
@@ -3076,6 +3272,37 @@ export interface components {
             last_name: string;
             school_id: number;
             requested_class_id?: number;
+        };
+        OpenCodeSession: {
+            id: number;
+            title: string;
+            workspace: string;
+            model_provider?: string;
+            model_id?: string;
+            message_count: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        CreateOpenCodeSessionRequest: {
+            title?: string;
+        };
+        OpenCodeMessage: {
+            id: number;
+            /** @enum {string} */
+            role: "user" | "assistant";
+            content: string;
+            tokens?: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        SendOpenCodeMessageRequest: {
+            content: string;
+        };
+        OpenCodeStatus: {
+            configured: boolean;
+            reachable: boolean;
+            base_url?: string;
+            hint?: string;
         };
         JoinRequest: {
             id: number;

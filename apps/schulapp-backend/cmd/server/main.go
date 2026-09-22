@@ -79,7 +79,9 @@ func main() {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.URL.Path == "/health" || req.URL.Path == "/api/v1/health" || req.URL.Path == "/ws" ||
 				req.URL.Path == "/api/v1/auth/login" || req.URL.Path == "/api/v1/auth/refresh" || req.URL.Path == "/api/v1/auth/logout" ||
-				req.URL.Path == "/api/v1/auth/register" || req.URL.Path == "/api/v1/public/schools" || req.URL.Path == "/api/v1/public/classes" {
+				req.URL.Path == "/api/v1/auth/register" || req.URL.Path == "/api/v1/public/schools" || req.URL.Path == "/api/v1/public/classes" ||
+				req.URL.Path == "/api/v1/mcp" || req.URL.Path == "/api/v1/mcp/" ||
+				req.URL.Path == "/api/v1/mcp/messages" {
 				next.ServeHTTP(w, req)
 				return
 			}
@@ -99,15 +101,36 @@ func main() {
 		RegisterLimiter: handler.NewIPRateLimiter(rate.Every(time.Minute), 10),
 		// UPLOAD_DIR is the deployed Compose setting. FILE_STORAGE_PATH remains a
 		// backwards-compatible local override.
-		UploadDir:            envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
-		Hub:                  ws.NewHub(),
+		UploadDir: envOrDefault("UPLOAD_DIR", envOrDefault("FILE_STORAGE_PATH", "./data/uploads")),
+		Hub:       ws.NewHub(),
 		// SchoolConnect läuft als Sidecar-Service im Compose-Netz
 		// ("schoolconnect:8081", SC_REQUIRE_TENANT=true); der Proxy setzt
 		// X-SC-Tenant aus der JWT-user_id (pro App-Benutzer isoliert).
 		SchoolConnectBaseURL: envOrDefault("SCHOOLCONNECT_BASE_URL", "http://schoolconnect:8081"),
+		// OpenCode läuft als gemeinsamer Sidecar-Service im Compose-Netz
+		// ("opencode:8082"); Tenant-Trennung via /workspaces/<user_id> +
+		// Ownership-Checks im Backend (siehe handler/opencode.go). Lokal ohne
+		// Compose zeigt OPENCODE_BASE_URL auf einen manuellen `opencode serve`.
+		OpenCodeBaseURL:       envOrDefault("OPENCODE_BASE_URL", "http://opencode:8082"),
+		OpenCodeWorkspaceRoot: envOrDefault("OPENCODE_WORKSPACE_ROOT", "/workspaces"),
 	}
 
 	r.Get("/ws", srv.HandleWS)
+
+	// OpenCode-Integration (KI-Lernchat, Multi-Tenant-Sidecar): Die
+	// Sessions-Routen laufen über den OpenAPI-Router (JWT davor,
+	// Ownership-Check pro Request, Tenant serverseitig in
+	// /workspaces/<user_id>). Der MCP-Endpunkt braucht zusätzlich den
+	// Session-Token-Pfad (X-Session-Token für OpenCode als MCP-Client) und
+	// den SSE-Legacy-Modus (GET als Event-Stream) — deshalb manuell
+	// registriert, aber ebenfalls aus der JWT-Pflicht ausgenommen, wobei
+	// HandleMCP den Tenant selbst auflöst (siehe handler/mcp.go).
+	r.Route("/api/v1/mcp", func(r chi.Router) {
+		r.Get("/", srv.HandleMCP)
+		r.Post("/", srv.HandleMCP)
+		r.Get("/messages", srv.HandleMCP)
+		r.Post("/messages", srv.HandleMCP)
+	})
 
 	// SchoolConnect-Integration (v0.3.0-Proxy, Multi-Tenant-Sidecar):
 	// eigenes Auth (JWT) bleibt davor — der Proxy setzt X-SC-Tenant aus
