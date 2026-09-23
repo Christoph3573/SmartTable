@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  diagnoseMcp,
   diagnoseSidecars,
   probe,
   type ProbeMethod,
@@ -11,6 +12,7 @@ import { Button } from "../ui/Button";
 
 const QUICK_TESTS: { label: string; method: ProbeMethod; path: string; body?: string }[] = [
   { label: "OpenCode-Status", method: "GET", path: "/api/v1/integrations/opencode/status" },
+  { label: "MCP-Server (KI-Tools)", method: "GET", path: "/api/v1/integrations/opencode/mcp-status" },
   { label: "OpenCode-Sessions", method: "GET", path: "/api/v1/integrations/opencode/sessions" },
   { label: "SchoolConnect-Status", method: "GET", path: "/api/v1/integrations/schoolconnect/status" },
   {
@@ -80,6 +82,8 @@ export function DebugConsole() {
           <SidecarCard key={item.key} item={item} />
         ))}
       </div>
+
+      <McpCard />
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -165,6 +169,59 @@ export function DebugConsole() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function McpCard() {
+  const mcp = useQuery({
+    queryKey: ["diagnostics", "mcp"],
+    queryFn: diagnoseMcp,
+    retry: 0,
+  });
+
+  const statusLabel = mcp.isLoading
+    ? "Prüfe …"
+    : mcp.data?.connected
+    ? "MCP verbunden"
+    : mcp.data?.reachable
+    ? "Nicht verbunden"
+    : "Nicht erreichbar";
+  const pill = mcp.data?.connected ? "pill blue" : mcp.isLoading ? "pill" : "pill red";
+
+  return (
+    <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <strong className="block truncate text-sm text-gray-900 dark:text-white">
+            KI-Tools (MCP-Server smarttable)
+          </strong>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            Prüft, ob OpenCode den Backend-MCP-Server erreicht — darüber bekommt die Lern-KI
+            Stundenplan, Vertretungen, Hausaufgaben und Vokabeln.
+          </p>
+        </div>
+        <span className={pill}>{statusLabel}</span>
+      </div>
+      {mcp.data?.mcp_url && (
+        <p className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">{mcp.data.mcp_url}</p>
+      )}
+      {!mcp.isLoading && !mcp.data?.connected && mcp.data && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          {mcp.data.hint ??
+            "Der MCP-Server ist aus dem opencode-Container nicht erreichbar. Prüfen: gleiche Compose-Netz, OPENCODE_MCP_URL=http://backend:8080/api/v1/mcp."}
+        </p>
+      )}
+      <div className="mt-2 flex items-center gap-2">
+        <Button size="sm" variant="secondary" loading={mcp.isFetching} onClick={() => mcp.refetch()}>
+          MCP-Verbindung testen
+        </Button>
+      </div>
+      {mcp.data?.servers && (
+        <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-gray-50 p-2 text-xs dark:bg-gray-900">
+          {pretty(mcp.data.servers)}
+        </pre>
+      )}
     </div>
   );
 }

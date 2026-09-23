@@ -322,6 +322,11 @@ func (h *Server) mcpResolveClass(r *http.Request, userID int, role string, args 
 }
 
 func (h *Server) mcpSchedule(r *http.Request, userID int, role string, args map[string]any) (string, bool) {
+	// Ohne SmartTable-Klasse (z. B. SchoolConnect-Nutzer) auf das
+	// Schülerportal zurückfallen, damit die KI trotzdem echte Daten bekommt.
+	if len(h.mcpUserClasses(r, userID, role)) == 0 {
+		return h.mcpScheduleExternal(r, userID)
+	}
 	classID, errText, isErr := h.mcpResolveClass(r, userID, role, args)
 	if isErr {
 		return errText, true
@@ -412,7 +417,7 @@ func mcpWeekRange(weekOf string) (time.Time, time.Time) {
 func (h *Server) mcpSubstitutions(r *http.Request, userID int, role string, args map[string]any) (string, bool) {
 	own := h.mcpUserClasses(r, userID, role)
 	if len(own) == 0 {
-		return "Du bist noch keiner Klasse zugeordnet.", true
+		return h.mcpSubstitutionsExternal(r, userID, args)
 	}
 	from := mcpStrArg(args, "date_from")
 	to := mcpStrArg(args, "date_to")
@@ -504,7 +509,7 @@ func (h *Server) mcpSubstitutions(r *http.Request, userID int, role string, args
 func (h *Server) mcpHomework(r *http.Request, userID int, role string, args map[string]any) (string, bool) {
 	own := h.mcpUserClasses(r, userID, role)
 	if len(own) == 0 {
-		return "Du bist noch keiner Klasse zugeordnet.", true
+		return h.mcpHomeworkExternal(r, userID)
 	}
 	var classFilter any
 	if id, ok := mcpIntArg(args, "class_id"); ok && id > 0 {
@@ -555,6 +560,167 @@ func (h *Server) mcpHomework(r *http.Request, userID int, role string, args map[
 		return "Aktuell stehen keine Hausaufgaben an.", false
 	}
 	return "Hausaufgaben:\n" + strings.Join(lines, "\n"), false
+}
+
+// mcpSchoolConnectData ruft eine Schülerportal-Funktion über den
+// SchoolConnect-Proxy mit dem Tenant des Users ab und liefert das `data`-Feld.
+func (h *Server) mcpSchoolConnectData(r *http.Request, userID int, function string) (json.RawMessage, bool) {
+	target := h.schoolConnectBase() + "/api/schuelerportal/" + function
+	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
+	if err != nil || status != http.StatusOK {
+		return nil, false
+	}
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil || len(env.Data) == 0 {
+		return nil, false
+	}
+	return env.Data, true
+}
+
+var mcpDayLabels = []string{"Mo", "Di", "Mi", "Do", "Fr"}
+
+// mcpScheduleExternal liefert den Schülerportal-Stundenplan als Text.
+func (h *Server) mcpScheduleExternal(r *http.Request, userID int) (string, bool) {
+	data, ok := h.mcpSchoolConnectData(r, userID, "stundenplan")
+	if !ok {
+		return "Weder eine SmartTable-Klasse zugeordnet noch das Schülerportal (SchoolConnect) erreichbar — bitte in den Einstellungen anmelden.", true
+	}
+	var tt struct {
+		Schule    string `json:"schule"`
+		Eintraege []struct {
+			Tag    string `json:"tag"`
+			Day    int    `json:"day"`
+			Stunde int    `json:"stunde"`
+			Kurs   string `json:"kurs"`
+			Raum   string `json:"raum"`
+		} `json:"eintraege"`
+	}
+	if err := json.Unmarshal(data, &tt); err != nil {
+		return "Stundenplan-Antwort des Schülerportals unverständlich.", true
+	}
+	if len(tt.Eintraege) == 0 {
+		return "Das Schülerportal meldet keine Stundenplaneinträge.", false
+	}
+	lines := make([]string, 0, len(tt.Eintraege))
+	for _, e := range tt.Eintraege {
+		day := e.Tag
+		if e.Day >= 0 && e.Day < len(mcpDayLabels) {
+			day = mcpDayLabels[e.Day]
+		}
+		line := day + " " + itoa(e.Stunde) + ". Std: " + e.Kurs
+		if e.Raum != "" {
+			line += " (Raum " + e.Raum + ")"
+		}
+		lines = append(lines, line)
+	}
+	prefix := "Stundenplan (Schülerportal via SchoolConnect)"
+	if tt.Schule != "" {
+		prefix += " — " + tt.Schule
+	}
+	return prefix + ":\n" + strings.Join(lines, "\n"), false
+}
+
+// mcpSubstitutionsExternal liefert die Schülerportal-Vertretungen als Text.
+func (h *Server) mcpSubstitutionsExternal(r *http.Request, userID int, args map[string]any) (string, bool) {
+	params := urlValues{}
+	if datum := mcpStrArg(args, "date_from"); datum != "" {
+		params["datum"] = datum
+	} else if datum := mcpStrArg(args, "date"); datum != "" {
+		params["datum"] = datum
+	}
+	function := "vertretungsplan"
+	target := h.schoolConnectBase() + "/api/schuelerportal/" + function
+	if len(params) > 0 {
+		target += "?" + params.encode()
+	}
+	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
+	if err != nil || status != http.StatusOK {
+		return "Vertretungsplan konnte weder aus SmartTable noch aus dem Schülerportal geladen werden.", true
+	}
+	var env struct {
+		Data struct {
+			Eintraege []map[string]any `json:"eintraege"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return "Vertretungs-Antwort des Schülerportals unverständlich.", true
+	}
+	if len(env.Data.Eintraege) == 0 {
+		return "Das Schülerportal meldet aktuell keine Vertretungen.", false
+	}
+	lines := make([]string, 0, len(env.Data.Eintraege))
+	for _, e := range env.Data.Eintraege {
+		lines = append(lines, "• "+mcpAnyStr(e, "date", "datum", "tag")+" "+
+			mcpAnyStr(e, "hour", "stunde", "period")+". Std: "+
+			mcpAnyStr(e, "uf", "kurs", "fach", "class")+
+			mcpSubDetail(e))
+	}
+	return "Vertretungen (Schülerportal via SchoolConnect):\n" + strings.Join(lines, "\n"), false
+}
+
+func mcpSubDetail(e map[string]any) string {
+	var parts []string
+	if room := mcpAnyStr(e, "room", "raum"); room != "" {
+		parts = append(parts, "Raum "+room)
+	}
+	if reason := mcpAnyStr(e, "reason", "grund", "text", "note"); reason != "" {
+		parts = append(parts, reason)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(parts, ", ") + ")"
+}
+
+// mcpHomeworkExternal liefert die Schülerportal-Hausaufgaben als Text.
+func (h *Server) mcpHomeworkExternal(r *http.Request, userID int) (string, bool) {
+	data, ok := h.mcpSchoolConnectData(r, userID, "hausaufgaben")
+	if !ok {
+		return "Hausaufgaben konnten weder aus SmartTable noch aus dem Schülerportal geladen werden.", true
+	}
+	var hw struct {
+		Aufgaben []map[string]any `json:"aufgaben"`
+	}
+	if err := json.Unmarshal(data, &hw); err != nil {
+		return "Hausaufgaben-Antwort des Schülerportals unverständlich.", true
+	}
+	if len(hw.Aufgaben) == 0 {
+		return "Das Schülerportal meldet aktuell keine Hausaufgaben.", false
+	}
+	lines := make([]string, 0, len(hw.Aufgaben))
+	for _, a := range hw.Aufgaben {
+		line := "• " + mcpAnyStr(a, "titel", "title", "aufgabe", "text")
+		if fach := mcpAnyStr(a, "fach", "uf", "kurs", "subject"); fach != "" {
+			line += " (" + fach + ")"
+		}
+		if due := mcpAnyStr(a, "faellig", "fällig", "due", "due_date", "datum", "abgabedatum"); due != "" {
+			line += " — fällig " + due
+		}
+		lines = append(lines, line)
+	}
+	return "Hausaufgaben (Schülerportal via SchoolConnect):\n" + strings.Join(lines, "\n"), false
+}
+
+// mcpAnyStr liest den ersten nicht-leeren String-Wert aus mehreren möglichen
+// Schlüsseln (die Schülerportal-Felder sind nicht strikt spezifiziert).
+func mcpAnyStr(m map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if v, ok := m[key]; ok {
+			switch t := v.(type) {
+			case string:
+				if strings.TrimSpace(t) != "" {
+					return strings.TrimSpace(t)
+				}
+			case float64:
+				return strconv.FormatFloat(t, 'f', -1, 64)
+			case json.Number:
+				return t.String()
+			}
+		}
+	}
+	return ""
 }
 
 // mcpLearningPlan fragt LehrplanPLUS über SchoolConnect (tenantlos,

@@ -41,6 +41,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -96,20 +97,33 @@ const openCodeSystemPrompt = "Du bist die Lern-KI von SmartTable — ein freundl
 	"wo sinnvoll, `Code` für Fachbegriffe). Keine Hausaufgaben-Lösungen zum Abschreiben — " +
 	"erkläre den Lösungsweg Schritt für Schritt."
 
-// openCodeDenyAll sperrt alle ausführenden Tools in der OpenCode-Session;
-// question (Rückfragen an den User) bleibt erlaubt.
+// openCodeDenyAll sperrt alle ausführenden Built-in-Tools in der
+// OpenCode-Session.
 var openCodeDenyAll = []map[string]string{
 	{"permission": "bash", "pattern": "*", "action": "deny"},
+	{"permission": "shell", "pattern": "*", "action": "deny"},
 	{"permission": "read", "pattern": "*", "action": "deny"},
 	{"permission": "glob", "pattern": "*", "action": "deny"},
 	{"permission": "grep", "pattern": "*", "action": "deny"},
 	{"permission": "edit", "pattern": "*", "action": "deny"},
 	{"permission": "write", "pattern": "*", "action": "deny"},
 	{"permission": "task", "pattern": "*", "action": "deny"},
+	{"permission": "fetch", "pattern": "*", "action": "deny"},
 	{"permission": "webfetch", "pattern": "*", "action": "deny"},
 	{"permission": "websearch", "pattern": "*", "action": "deny"},
+	{"permission": "search", "pattern": "*", "action": "deny"},
 	{"permission": "skill", "pattern": "*", "action": "deny"},
 	{"permission": "todowrite", "pattern": "*", "action": "deny"},
+	{"permission": "todo", "pattern": "*", "action": "deny"},
+	{"permission": "patch", "pattern": "*", "action": "deny"},
+	{"permission": "lsp", "pattern": "*", "action": "deny"},
+	{"permission": "plan", "pattern": "*", "action": "deny"},
+	{"permission": "execute", "pattern": "*", "action": "deny"},
+	// MCP-Tools des SmartTable-Backends explizit erlauben: OpenCode fragt
+	// sonst pro Tool-Aufruf um Erlaubnis (headless = blockiert). Das
+	// Wildcard passt auf „smarttable_get_schedule“ usw.
+	{"permission": "smarttable_*", "pattern": "*", "action": "allow"},
+	{"permission": "question", "pattern": "*", "action": "allow"},
 }
 
 // openCodeBase liefert die konfigurierte OpenCode-Adresse (ohne trailing
@@ -304,20 +318,82 @@ func (h *Server) GetApiV1IntegrationsOpencodeStatus(w http.ResponseWriter, r *ht
 	})
 }
 
-// GetApiV1IntegrationsOpencodeSessions listet die eigenen Sessions
-// (Superadmin sieht alle).
+// GetApiV1IntegrationsOpencodeMcpStatus prüft, ob der smarttable-MCP-Server
+// aus dem opencode-Container erreichbar/verbunden ist (Diagnose). Ist er noch
+// nicht registriert, wird er mit einem frischen Session-Token testweise
+// registriert — so testet der Aufruf den echten Netzwerkpfad
+// opencode -> backend.
+func (h *Server) GetApiV1IntegrationsOpencodeMcpStatus(w http.ResponseWriter, r *http.Request) {
+	c := h.claims(w, r)
+	if c == nil {
+		return
+	}
+	base := h.openCodeBase()
+	workspace := h.openCodeWorkspaceDir(c.UserID)
+	mcpURL := h.openCodeMCPURL()
+
+	status, raw, err := openCodeDo(openCodeClient(), http.MethodGet,
+		base+"/mcp?directory="+url.QueryEscape(workspace), nil)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"reachable": false, "connected": false, "mcp_url": mcpURL, "hint": openCodeHint,
+		})
+		return
+	}
+	if status != http.StatusOK {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"reachable": false, "connected": false, "mcp_url": mcpURL,
+			"status": status, "raw": string(raw),
+		})
+		return
+	}
+	servers := map[string]any{}
+	_ = json.Unmarshal(raw, &servers)
+	connected, _ := mcpServerConnected(servers)
+
+	if _, ok := servers["smarttable"]; !ok {
+		if token, terr := h.openCodeSessionTokenQuiet(r, c.UserID); terr == nil {
+			regStatus, regRaw, regErr := h.openCodeAddMCP(base, workspace, token)
+			switch {
+			case regErr != nil:
+				servers["register_error"] = regErr.Error()
+			case regStatus == http.StatusOK || regStatus == http.StatusCreated:
+				_ = json.Unmarshal(regRaw, &servers)
+				connected, _ = mcpServerConnected(servers)
+			default:
+				servers["register_status"] = regStatus
+				servers["register_raw"] = string(regRaw)
+			}
+		} else {
+			servers["token_error"] = terr.Error()
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"reachable": true, "connected": connected,
+		"mcp_url": mcpURL, "workspace": workspace, "servers": servers,
+	})
+}
+
+// mcpServerConnected liest den smarttable-Status aus der MCP-Statusmap.
+func mcpServerConnected(servers map[string]any) (bool, bool) {
+	entry, ok := servers["smarttable"].(map[string]any)
+	if !ok {
+		return false, false
+	}
+	st, _ := entry["status"].(string)
+	return st == "connected", true
+}
+
+// GetApiV1IntegrationsOpencodeSessions listet ausschließlich die eigenen
+// Sessions — auch Superadmins sehen hier nur ihre eigenen Chats (fremde
+// Sessions dürfen nie in einem anderen Account auftauchen).
 func (h *Server) GetApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r *http.Request) {
 	c := h.claims(w, r)
 	if c == nil {
 		return
 	}
 	query := openCodeSessionSelect + ` WHERE s.owner_id=$1 ORDER BY s.updated_at DESC`
-	args := []any{c.UserID}
-	if isSuperadmin(c.Role) {
-		query = openCodeSessionSelect + ` ORDER BY s.updated_at DESC`
-		args = nil
-	}
-	rows, err := h.DB.QueryContext(r.Context(), query, args...)
+	rows, err := h.DB.QueryContext(r.Context(), query, c.UserID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Datenbankfehler")
 		return
@@ -431,28 +507,65 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r 
 // openCodeSessionToken erzeugt ein kurzlebiges Session-Token (JWT-User
 // eingebettet), das der MCP-Server als Tenant-Nachweis akzeptiert.
 func (h *Server) openCodeSessionToken(w http.ResponseWriter, r *http.Request, userID int) (string, bool) {
-	var raw [32]byte
-	if _, err := rand.Read(raw[:]); err != nil {
+	token, err := h.openCodeSessionTokenQuiet(r, userID)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
 		return "", false
+	}
+	return token, true
+}
+
+// openCodeSessionTokenQuiet wie openCodeSessionToken, aber ohne HTTP-Antwort
+// (für die Diagnose).
+func (h *Server) openCodeSessionTokenQuiet(r *http.Request, userID int) (string, error) {
+	var raw [32]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", err
 	}
 	token := hex.EncodeToString(raw[:])
 	if _, err := h.DB.ExecContext(r.Context(),
 		`INSERT INTO opencode_session_tokens (token, user_id, expires_at) VALUES ($1,$2,NOW() + INTERVAL '24 hours')`,
 		token, userID,
 	); err != nil {
-		writeError(w, http.StatusInternalServerError, "Datenbankfehler")
-		return "", false
+		return "", err
 	}
-	return token, true
+	return token, nil
 }
 
-// openCodeRegisterMCP registriert den Backend-MCP-Server in der
-// OpenCode-Session (directory-scoped, tenant-isoliert). Remote-URL zeigt auf
-// das Backend im Compose-Netz; der Tenant reist als Header mit.
-func (h *Server) openCodeRegisterMCP(w http.ResponseWriter, base, workspace, sessionToken string) error {
+// openCodeEnsurePermissions setzt die Session-Rechte (deny Built-ins + allow
+// SmartTable-MCP) per PATCH /session/{id}. Wird vor jedem Prompt aufgerufen,
+// damit auch ältere Sessions (bei denen das frühere `tools`-Feld die Rechte
+// überschrieben hatte) wieder MCP-Tools nutzen können. Best-effort: Fehler
+// werden geloggt, blockieren das Senden aber nicht.
+func (h *Server) openCodeEnsurePermissions(base, workspace, opencodeID string) error {
+	status, raw, err := openCodeDo(openCodeClient(), http.MethodPatch,
+		base+"/session/"+url.PathEscape(opencodeID)+"?directory="+url.QueryEscape(workspace),
+		map[string]any{"permission": openCodeDenyAll})
+	if err != nil {
+		log.Printf("opencode: Session-Rechte setzen fehlgeschlagen: %v", err)
+		return err
+	}
+	if status != http.StatusOK && status != http.StatusNoContent {
+		log.Printf("opencode: Session-Rechte setzen Status %d: %s", status, string(raw))
+		return fmt.Errorf("permission patch status %d", status)
+	}
+	return nil
+}
+
+// openCodeMCPStatus liest den MCP-Status des Verzeichnisses aus OpenCode
+// (GET /mcp?directory=...) — zeigt, ob der smarttable-MCP-Server verbunden
+// ist. Genutzt von der Diagnose.
+func (h *Server) openCodeMCPStatus(workspace string) (int, []byte, error) {
+	return openCodeDo(openCodeClient(), http.MethodGet,
+		h.openCodeBase()+"/mcp?directory="+url.QueryEscape(workspace), nil)
+}
+
+// openCodeAddMCP registriert den Backend-MCP-Server (directory-scoped) und
+// gibt den Rohstatus zurück — ohne HTTP-Nebenwirkungen, damit sowohl die
+// Session-Anlage als auch die Diagnose ihn nutzen können.
+func (h *Server) openCodeAddMCP(base, workspace, sessionToken string) (int, []byte, error) {
 	mcpURL := h.openCodeMCPURL()
-	status, raw, err := openCodeDo(openCodeClient(), http.MethodPost,
+	return openCodeDo(openCodeClient(), http.MethodPost,
 		base+"/mcp?directory="+url.QueryEscape(workspace),
 		map[string]any{
 			"name": "smarttable",
@@ -464,6 +577,15 @@ func (h *Server) openCodeRegisterMCP(w http.ResponseWriter, base, workspace, ses
 				"oauth":   false,
 			},
 		})
+}
+
+// openCodeRegisterMCP registriert den Backend-MCP-Server in der
+// OpenCode-Session (directory-scoped, tenant-isoliert). Remote-URL zeigt auf
+// das Backend im Compose-Netz; der Tenant reist als Header mit. Der von
+// OpenCode zurückgemeldete Verbindungsstatus wird geprüft: Ist der Server
+// nicht „connected", wird das geloggt (die Diagnose zeigt Details).
+func (h *Server) openCodeRegisterMCP(w http.ResponseWriter, base, workspace, sessionToken string) error {
+	status, raw, err := h.openCodeAddMCP(base, workspace, sessionToken)
 	if err != nil {
 		openCodeUnreachable(w, base)
 		return err
@@ -472,7 +594,25 @@ func (h *Server) openCodeRegisterMCP(w http.ResponseWriter, base, workspace, ses
 		writeError(w, http.StatusBadGateway, "MCP-Server konnte nicht registriert werden (Status "+strconv.Itoa(status)+"): "+string(raw))
 		return fmt.Errorf("mcp register status %d", status)
 	}
+	h.logMCPStatus(raw)
 	return nil
+}
+
+// logMCPStatus protokolliert, wenn OpenCode den smarttable-MCP-Server nicht
+// als „connected" meldet (z. B. weil das Backend aus dem opencode-Container
+// nicht erreichbar ist).
+func (h *Server) logMCPStatus(raw []byte) {
+	var statuses map[string]struct {
+		Status string `json:"status"`
+		Error  string `json:"error"`
+	}
+	if err := json.Unmarshal(raw, &statuses); err != nil {
+		return
+	}
+	if st, ok := statuses["smarttable"]; ok && st.Status != "connected" {
+		log.Printf("opencode: MCP-Server smarttable nicht verbunden (status=%s error=%s url=%s)",
+			st.Status, st.Error, h.openCodeMCPURL())
+	}
 }
 
 // openCodeMCPURL ist die Backend-MCP-URL aus Sicht des opencode-Containers
@@ -571,9 +711,14 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.Response
 		return
 	}
 	base := h.openCodeBase()
+	// Session-Berechtigungen vor dem Prompt setzen: In OpenCode v1.18
+	// ERSETZT das (deprecated) `tools`-Feld im Prompt die Session-Rechte
+	// komplett — deshalb schicken wir es nicht mit (sonst fällt das
+	// SmartTable-Allow weg und die MCP-Tools fragen headless um Erlaubnis).
+	// Stattdessen stellen wir die Rechte per PATCH /session/{id} sicher.
+	_ = h.openCodeEnsurePermissions(base, s.Workspace, s.OpencodeID)
 	msgBody := map[string]any{
 		"system": openCodeSystemPrompt,
-		"tools":  map[string]bool{"question": true},
 		"parts":  []map[string]string{{"type": "text", "text": content}},
 	}
 	if model := openCodeModelPayload(h.openCodeModel()); model != nil {

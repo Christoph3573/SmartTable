@@ -118,3 +118,29 @@ export async function diagnoseSidecars(): Promise<SidecarDiagnosis[]> {
     toDiagnosis("schoolconnect", "SchoolConnect", school),
   ];
 }
+
+/** MCP-Status: ist der smarttable-MCP-Server aus OpenCode erreichbar? */
+export type McpStatus = {
+  reachable: boolean;
+  connected: boolean;
+  mcp_url?: string;
+  workspace?: string;
+  servers?: unknown;
+  hint?: string;
+};
+
+export async function diagnoseMcp(): Promise<McpStatus> {
+  const result = await probe("/api/v1/integrations/opencode/mcp-status");
+  const payload =
+    result.data && typeof result.data === "object"
+      ? (result.data as Record<string, unknown>)
+      : {};
+  return {
+    reachable: Boolean(payload.reachable),
+    connected: Boolean(payload.connected),
+    mcp_url: typeof payload.mcp_url === "string" ? payload.mcp_url : undefined,
+    workspace: typeof payload.workspace === "string" ? payload.workspace : undefined,
+    servers: payload.servers,
+    hint: typeof payload.hint === "string" ? payload.hint : undefined,
+  };
+}
