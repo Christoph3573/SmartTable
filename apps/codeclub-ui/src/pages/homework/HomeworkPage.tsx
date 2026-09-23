@@ -6,6 +6,7 @@ import { schoolApi, type Homework, type HomeworkInput, type HomeworkSubmission, 
 import { schoolConnectApi } from "../../api/schoolconnect";
 import { useAuthStore } from "../../store/authStore";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useCourseVisibility } from "../../lib/useCourseVisibility";
 import { Button } from "../../components/ui/Button";
 import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
 import { formatDate } from "../../lib/format";
@@ -20,6 +21,7 @@ export function HomeworkPage() {
   const user = useAuthStore((state) => state.user);
   const provider = useSettingsStore((s) => s.provider);
   const isExternal = provider === "schoolconnect";
+  const visibility = useCourseVisibility();
   const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes, enabled: !isExternal });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: schoolApi.subjects, enabled: !isExternal });
   const activeClassId = classId ?? classes.data?.[0]?.id;
@@ -50,9 +52,12 @@ export function HomeworkPage() {
   });
   const subject = (id: number) => subjects.data?.find((entry) => entry.id === id)?.short ?? "Fach";
   const selectClass = (id: number) => setClassId(id);
+  const ownHomework = (homework.data ?? []).filter((item) => !visibility.hiddenSubject(item.subject_id));
 
   if (isExternal) {
-    const aufgaben = external.data?.aufgaben ?? [];
+    const aufgaben = (external.data?.aufgaben ?? []).filter(
+      (item) => !visibility.hiddenKurs(field(item, "uf", "kurs", "fach"))
+    );
     return (
       <div className="page">
         <PageHeader eyebrow="Lernplan · SchoolConnect" title="Hausaufgaben" />
@@ -91,7 +96,7 @@ export function HomeworkPage() {
   }
 
   return <div className="page"><PageHeader eyebrow="Lernplan" title="Hausaufgaben"><select aria-label="Klasse wählen" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" value={activeClassId ?? ""} onChange={(event) => selectClass(Number(event.target.value))}>{classes.data?.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>{isTeacher && <Button onClick={() => setCreateOpen(true)}>Aufgabe anlegen</Button>}</PageHeader>
-    {classes.isLoading || (activeClassId && homework.isLoading) ? <LoadingState /> : classes.isError || homework.isError ? <ErrorState onRetry={() => { classes.refetch(); homework.refetch(); }} /> : !activeClassId ? <EmptyState title="Keine Klasse verfügbar" description="Sobald du einer Klasse zugeordnet bist, findest du hier ihre Aufgaben." /> : <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">{homework.data?.length ? homework.data.slice().sort((a, b) => a.due_date.localeCompare(b.due_date)).map((item) => {
+    {classes.isLoading || (activeClassId && homework.isLoading) ? <LoadingState /> : classes.isError || homework.isError ? <ErrorState onRetry={() => { classes.refetch(); homework.refetch(); }} /> : !activeClassId ? <EmptyState title="Keine Klasse verfügbar" description="Sobald du einer Klasse zugeordnet bist, findest du hier ihre Aufgaben." /> : <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">{ownHomework.length ? ownHomework.slice().sort((a, b) => a.due_date.localeCompare(b.due_date)).map((item) => {
       const late = new Date(`${item.due_date}T23:59:59`) < new Date();
       const own = ownSubmission.get(item.id);
       const graded = own?.status === "graded";

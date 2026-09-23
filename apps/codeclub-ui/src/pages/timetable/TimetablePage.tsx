@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { schoolApi, type LessonInput, type TimetableEntry, type UpdateLessonInput } from "../../api/school";
 import { schoolConnectApi, scTimetableEntryLabel, type SchuelerportalTimetableEntry } from "../../api/schoolconnect";
+import { useCourseVisibility } from "../../lib/useCourseVisibility";
 import { useAuthStore } from "../../store/authStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { Button } from "../../components/ui/Button";
@@ -38,6 +39,7 @@ export function TimetablePage() {
 
   const provider = useSettingsStore((s) => s.provider);
   const isExternal = provider === "schoolconnect";
+  const visibility = useCourseVisibility();
   const canManage = !isExternal && (user?.role === "teacher" || user?.role === "school_admin" || user?.role === "superadmin" || user?.role === "admin");
 
   const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes, enabled: !isExternal });
@@ -71,17 +73,37 @@ export function TimetablePage() {
 
   const byCell = useMemo(() => {
     const map = new Map<string, TimetableEntry>();
-    (timetable.data ?? []).forEach((entry) => map.set(`${entry.lesson.day_of_week}-${entry.lesson.period}`, entry));
+    (timetable.data ?? []).forEach((entry) => {
+      if (visibility.hiddenSubject(entry.lesson.subject_id)) return;
+      map.set(`${entry.lesson.day_of_week}-${entry.lesson.period}`, entry);
+    });
     return map;
-  }, [timetable.data]);
+  }, [timetable.data, visibility]);
+
+  // Eigene Kursstunden als Overlay (nur belegte eigene Kurse).
+  const customByCell = useMemo(() => {
+    const map = new Map<string, { name: string; short?: string; room?: string; color?: string }>();
+    visibility.custom.forEach((course) => {
+      course.lessons.forEach((lesson) => {
+        map.set(`${lesson.day_of_week}-${lesson.period}`, {
+          name: course.name,
+          short: course.short,
+          room: lesson.room,
+          color: course.color,
+        });
+      });
+    });
+    return map;
+  }, [visibility.custom]);
 
   const externalByCell = useMemo(() => {
     const map = new Map<string, SchuelerportalTimetableEntry>();
-    (external.data?.eintraege ?? []).forEach((entry) =>
-      map.set(`${entry.day + 1}-${entry.stunde}`, entry)
-    );
+    (external.data?.eintraege ?? []).forEach((entry) => {
+      if (visibility.hiddenKurs((entry.kurs || entry.tag || "").trim())) return;
+      map.set(`${entry.day + 1}-${entry.stunde}`, entry);
+    });
     return map;
-  }, [external.data]);
+  }, [external.data, visibility]);
 
   const subjectShort = (id: number) => subjects.data?.find((s) => s.id === id)?.short ?? "?";
 
@@ -127,6 +149,14 @@ export function TimetablePage() {
                       <td className="border-b border-gray-50 px-2 py-2 text-center font-mono text-xs text-gray-400">{period}.</td>
                       {DAYS.map((day) => {
                         const entry = externalByCell.get(`${day.value}-${period}`);
+                        const custom = customByCell.get(`${day.value}-${period}`);
+                        if (!entry && custom) {
+                          return (
+                            <td key={day.value} className="border-b border-gray-50 px-1.5 py-1.5 align-top">
+                              <CustomCell course={custom} />
+                            </td>
+                          );
+                        }
                         if (!entry) return <td key={day.value} className="border-b border-gray-50 px-1.5 py-1.5 align-top"><div className="h-14" /></td>;
                         const label = scTimetableEntryLabel(entry);
                         return (
@@ -193,6 +223,7 @@ export function TimetablePage() {
                   <td className="border-b border-gray-50 px-2 py-2 text-center font-mono text-xs text-gray-400">{period}.</td>
                   {DAYS.map((day) => {
                     const entry = byCell.get(`${day.value}-${period}`);
+                    const custom = customByCell.get(`${day.value}-${period}`);
                     return (
                       <td key={day.value} className="border-b border-gray-50 px-1.5 py-1.5 align-top">
                         {entry ? (
@@ -203,6 +234,8 @@ export function TimetablePage() {
                             onEdit={() => setEditing({ dayOfWeek: day.value, period, entry })}
                             onDelete={() => deleteLesson.mutate(entry.lesson.id)}
                           />
+                        ) : custom ? (
+                          <CustomCell course={custom} />
                         ) : canManage ? (
                           <button
                             className="flex h-14 w-full items-center justify-center rounded-lg border border-dashed border-gray-200 text-xs text-gray-300 hover:border-indigo-300 hover:text-indigo-500"
@@ -239,6 +272,22 @@ export function TimetablePage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function CustomCell({ course }: { course: { name: string; short?: string; room?: string; color?: string } }) {
+  return (
+    <div
+      className="flex h-14 flex-col justify-center rounded-lg border px-2 py-1 text-xs"
+      style={{
+        borderColor: course.color || "#c7d2fe",
+        backgroundColor: `${course.color || "#6366f1"}1a`,
+        color: "#1f2937",
+      }}
+    >
+      <strong className="font-semibold">{course.short || course.name}</strong>
+      <span className="text-[11px] opacity-80">{course.room ? `Raum ${course.room}` : "Eigener Kurs"}</span>
     </div>
   );
 }

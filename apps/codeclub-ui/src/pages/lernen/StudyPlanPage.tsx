@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { schoolApi } from "../../api/school";
 import { schoolConnectApi } from "../../api/schoolconnect";
+import { useCourseVisibility } from "../../lib/useCourseVisibility";
 import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
 
 const SCHULARTEN = ["Gymnasium", "Realschule", "Mittelschule", "FOSBOS", "Grundschule"];
@@ -37,6 +38,7 @@ export function StudyPlanPage() {
 
   const classes = useQuery({ queryKey: ["classes"], queryFn: schoolApi.classes });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: schoolApi.subjects });
+  const visibility = useCourseVisibility();
   const activeClassId = classId ?? classes.data?.[0]?.id;
   const activeClass = classes.data?.find((c) => c.id === activeClassId);
   const timetable = useQuery({
@@ -46,9 +48,13 @@ export function StudyPlanPage() {
   });
 
   const mySubjects = useMemo(() => {
-    const ids = new Set((timetable.data ?? []).map((entry) => entry.lesson.subject_id));
+    const ids = new Set(
+      (timetable.data ?? [])
+        .filter((entry) => !visibility.hiddenSubject(entry.lesson.subject_id))
+        .map((entry) => entry.lesson.subject_id)
+    );
     return (subjects.data ?? []).filter((s) => ids.has(s.id));
-  }, [timetable.data, subjects.data]);
+  }, [timetable.data, subjects.data, visibility]);
 
   const lehrplan = useQuery({
     queryKey: ["lernplan-bayern", "search", search],

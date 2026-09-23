@@ -3,9 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { schoolApi, type Substitution, type SubstitutionInput, type UpdateSubstitutionInput } from "../../api/school";
-import { schoolConnectApi, scSubstitutionLabel } from "../../api/schoolconnect";
+import { schoolConnectApi, scSubstitutionLabel, scSubstitutionCourse } from "../../api/schoolconnect";
 import { useAuthStore } from "../../store/authStore";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useCourseVisibility } from "../../lib/useCourseVisibility";
 import { Button } from "../../components/ui/Button";
 import { EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/Page";
 import { formatDate } from "../../lib/format";
@@ -25,6 +26,7 @@ export function SubstitutionsPage() {
   const provider = useSettingsStore((s) => s.provider);
   const queryClient = useQueryClient();
   const isExternal = provider === "schoolconnect";
+  const visibility = useCourseVisibility();
   const substitutions = useQuery({
     queryKey: ["substitutions", date],
     queryFn: () => schoolApi.substitutions({ date_from: date, date_to: date }),
@@ -43,6 +45,12 @@ export function SubstitutionsPage() {
   const remove = useMutation({ mutationFn: schoolApi.deleteSubstitution, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["substitutions"] }) });
   const canEdit = !isExternal && (user?.role === "teacher" || user?.role === "school_admin" || user?.role === "superadmin" || user?.role === "admin");
   const subjectName = (id?: number) => subjects.data?.find((subject) => subject.id === id)?.short ?? "—";
+  const externalEntries = (external.data?.eintraege ?? []).filter(
+    (item) => !visibility.hiddenKurs(scSubstitutionCourse(item))
+  );
+  const ownSubstitutions = (substitutions.data ?? []).filter(
+    (item) => !(item.subject_id != null && visibility.hiddenSubject(item.subject_id))
+  );
 
   if (isExternal) {
     return (
@@ -65,8 +73,8 @@ export function SubstitutionsPage() {
             ) : (
               <ErrorState onRetry={() => external.refetch()} message="Der Vertretungsplan konnte von SchoolConnect nicht geladen werden." />
             )
-          ) : external.data.eintraege.length ? (
-            external.data.eintraege.map((item, index) => {
+          ) : externalEntries.length ? (
+            externalEntries.map((item, index) => {
               const label = scSubstitutionLabel(item);
               return (
                 <div className="data-row" key={index}>
@@ -77,14 +85,14 @@ export function SubstitutionsPage() {
               );
             })
           ) : (
-            <EmptyState title="Kein geänderter Unterricht" description="Für diesen Tag meldet das Schülerportal keine Vertretungen." />
+            <EmptyState title="Kein geänderter Unterricht" description="Für diesen Tag meldet das Schülerportal keine Vertretungen (bzw. alle abgewählten Kurse sind ausgeblendet)." />
           )}
         </section>
       </div>
     );
   }
 
-  return <div className="page"><PageHeader eyebrow="Tagesplan" title="Vertretungen"><input aria-label="Datum wählen" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" type="date" value={date} onChange={(event) => setDate(event.target.value)} />{canEdit && <Button onClick={() => setCreateOpen(true)}>Vertretung eintragen</Button>}</PageHeader><section className="overflow-hidden rounded-xl border border-gray-200 bg-white"><div className="flex items-center justify-between border-b border-gray-100 px-5 py-3"><span className="text-sm font-bold">{formatDate(date, { weekday: "long", day: "2-digit", month: "long" })}</span><span className="text-xs text-gray-500">Änderungen erscheinen sofort im Tagesplan.</span></div>{substitutions.isLoading ? <LoadingState /> : substitutions.isError ? <ErrorState onRetry={() => substitutions.refetch()} /> : substitutions.data?.length ? substitutions.data.slice().sort((a, b) => a.period - b.period).map((item) => <div className="data-row" key={item.id}><div className="grid size-10 place-items-center rounded-lg bg-indigo-50 text-sm font-extrabold text-indigo-700">{item.period}.</div><div className="data-row-main"><strong>{subjectName(item.subject_id)} · {item.room ? `Raum ${item.room}` : "Raum folgt"}</strong><p>{item.note || (item.type === "cancellation" ? "Diese Stunde entfällt." : "Lehrkraft und Raum wurden aktualisiert.")}</p></div><span className={`pill ${item.type === "cancellation" ? "red" : item.type === "room_change" ? "amber" : "blue"}`}>{labels[item.type]}</span>{canEdit && <><button className="text-button" onClick={() => setEditing(item)}>Bearbeiten</button><button className="text-button text-red-600" onClick={() => remove.mutate(item.id)}>Löschen</button></>}</div>) : <EmptyState title="Kein geänderter Unterricht" description="Für diesen Tag liegen keine Vertretungen vor." />}</section>{createOpen && <SubstitutionDialog classes={classes.data ?? []} subjects={subjects.data ?? []} onClose={() => setCreateOpen(false)} onSubmit={(data) => create.mutate(data as SubstitutionInput)} pending={create.isPending} error={create.isError} />}{editing && <SubstitutionDialog item={editing} classes={classes.data ?? []} subjects={subjects.data ?? []} onClose={() => setEditing(undefined)} onSubmit={(data) => update.mutate({ id: editing.id, data: data as UpdateSubstitutionInput })} pending={update.isPending} error={update.isError} />}
+  return <div className="page"><PageHeader eyebrow="Tagesplan" title="Vertretungen"><input aria-label="Datum wählen" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" type="date" value={date} onChange={(event) => setDate(event.target.value)} />{canEdit && <Button onClick={() => setCreateOpen(true)}>Vertretung eintragen</Button>}</PageHeader><section className="overflow-hidden rounded-xl border border-gray-200 bg-white"><div className="flex items-center justify-between border-b border-gray-100 px-5 py-3"><span className="text-sm font-bold">{formatDate(date, { weekday: "long", day: "2-digit", month: "long" })}</span><span className="text-xs text-gray-500">Änderungen erscheinen sofort im Tagesplan.</span></div>{substitutions.isLoading ? <LoadingState /> : substitutions.isError ? <ErrorState onRetry={() => substitutions.refetch()} /> : ownSubstitutions.length ? ownSubstitutions.slice().sort((a, b) => a.period - b.period).map((item) => <div className="data-row" key={item.id}><div className="grid size-10 place-items-center rounded-lg bg-indigo-50 text-sm font-extrabold text-indigo-700">{item.period}.</div><div className="data-row-main"><strong>{subjectName(item.subject_id)} · {item.room ? `Raum ${item.room}` : "Raum folgt"}</strong><p>{item.note || (item.type === "cancellation" ? "Diese Stunde entfällt." : "Lehrkraft und Raum wurden aktualisiert.")}</p></div><span className={`pill ${item.type === "cancellation" ? "red" : item.type === "room_change" ? "amber" : "blue"}`}>{labels[item.type]}</span>{canEdit && <><button className="text-button" onClick={() => setEditing(item)}>Bearbeiten</button><button className="text-button text-red-600" onClick={() => remove.mutate(item.id)}>Löschen</button></>}</div>) : <EmptyState title="Kein geänderter Unterricht" description="Für diesen Tag liegen keine Vertretungen vor." />}</section>{createOpen && <SubstitutionDialog classes={classes.data ?? []} subjects={subjects.data ?? []} onClose={() => setCreateOpen(false)} onSubmit={(data) => create.mutate(data as SubstitutionInput)} pending={create.isPending} error={create.isError} />}{editing && <SubstitutionDialog item={editing} classes={classes.data ?? []} subjects={subjects.data ?? []} onClose={() => setEditing(undefined)} onSubmit={(data) => update.mutate({ id: editing.id, data: data as UpdateSubstitutionInput })} pending={update.isPending} error={update.isError} />}
   </div>;
 }
 

@@ -11,6 +11,7 @@ import { CalendarPage } from "../pages/calendar/CalendarPage";
 import { FilesPage } from "../pages/files/FilesPage";
 import { HomeworkPage } from "../pages/homework/HomeworkPage";
 import { TimetablePage } from "../pages/timetable/TimetablePage";
+import { KursePage } from "../pages/courses/KursePage";
 import { ChatPage } from "../pages/chat/ChatPage";
 import { StudyPlanPage } from "../pages/lernen/StudyPlanPage";
 import { VocabPage } from "../pages/lernen/VocabPage";
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/dashboard", element: <DashboardPage /> },
           { path: "/timetable", element: <TimetablePage /> },
+          { path: "/courses", element: <KursePage /> },
           { path: "/substitutions", element: <SubstitutionsPage /> },
           { path: "/calendar", element: <CalendarPage /> },
           { path: "/files", element: <FilesPage /> },

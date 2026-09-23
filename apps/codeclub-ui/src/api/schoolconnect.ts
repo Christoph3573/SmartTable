@@ -180,3 +180,9 @@ export function scSubstitutionLabel(entry: SchuelerportalSubstitution): {
   const detail = [room ? `Raum ${room}` : "", reason].filter(Boolean).join(" · ");
   return { period, title, detail: detail || "Details im Vertretungsplan" };
 }
+
+/** Kurskürzel eines Vertretungs-Eintrags (für den Kurs-Filter). */
+export function scSubstitutionCourse(entry: SchuelerportalSubstitution): string {
+  const value = entry["uf"] ?? entry["kurs"] ?? entry["fach"] ?? entry["class"];
+  return typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+}
