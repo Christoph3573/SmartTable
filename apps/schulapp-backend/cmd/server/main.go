@@ -141,6 +141,21 @@ func main() {
 	// — der Proxy setzt X-SC-Tenant aus der JWT-user_id und erreicht das
 	// SchoolConnect-REST via Server-Netz.
 
+	// Kurse (Schule): Auswahl, welche Kurse der Nutzer belegt. Abgewählte
+	// Kurse werden im Stunden-/Vertretungsplan ausgeblendet; eigene Kurse
+	// bringen zusätzliche Kursstunden mit (JWT-Pflicht wie alle API-Routen).
+	r.Route("/api/v1/courses", func(r chi.Router) {
+		r.Get("/", srv.GetApiV1Courses)
+		r.Post("/", srv.PostApiV1Courses)
+		r.Put("/selection", srv.PutApiV1CoursesSelection)
+		r.Patch("/{id}", srv.PatchApiV1CoursesId)
+		r.Delete("/{id}", srv.DeleteApiV1CoursesId)
+	})
+
+	// MCP-Diagnose: prüft, ob der smarttable-MCP-Server aus dem
+	// opencode-Container erreichbar/verbunden ist (JWT-Pflicht).
+	r.Get("/api/v1/integrations/opencode/mcp-status", srv.GetApiV1IntegrationsOpencodeMcpStatus)
+
 	api.HandlerWithOptions(srv, api.ChiServerOptions{
 		BaseRouter: r,
 	})
