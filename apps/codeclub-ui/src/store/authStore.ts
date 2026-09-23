@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { authApi, type User } from "../api/auth";
 import { setAccessToken } from "../api/client";
+import { queryClient } from "../api/queryClient";
 
 type AuthState = {
   user: User | null;
@@ -22,6 +23,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const res = await authApi.login({ email, password });
       setAccessToken(res.data.access_token);
+      // Cache des vorherigen Accounts verwerfen, bevor die App ihn liest.
+      queryClient.clear();
       set({ user: res.data.user, isLoading: false });
     } catch (err) {
       set({ isLoading: false });
@@ -34,6 +37,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       await authApi.logout();
     } finally {
       setAccessToken(null);
+      // Ohne Full-Reload würde die App sonst die gecachten Daten des
+      // abgemeldeten Accounts weiter anzeigen (fremde Chats/Nachrichten).
+      queryClient.clear();
       set({ user: null });
     }
   },
