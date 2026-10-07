@@ -6,7 +6,8 @@ import { useChatUiStore } from "../store/chatUiStore";
 
 type IncomingEvent =
   | { type: "message"; message: ChatMessage }
-  | { type: "opencode"; session_id: number; message: { id: number; role: string; content: string; created_at: string } };
+  | { type: "opencode"; session_id: number; message: { id: number; role: string; content: string; created_at: string } }
+  | { type: "opencode_step"; session_id: number; step: { key: string; kind: string; label: string; status: string; detail?: string; tool?: string } };
 
 /**
  * Keeps one live WebSocket connection open for the lifetime of the app shell
@@ -38,9 +39,14 @@ export function useChatSocket() {
           return;
         }
         // OpenCode-Antworten (KI-Lernchat) an die AiChatPage weiterreichen —
-        // sie hört auf "smarttable:opencode" und pflegt sie in den Verlauf ein.
+        // sie hört auf "smarttable:opencode" (finale Nachricht = Fertig-Signal)
+        // und "smarttable:opencode_step" (transiente Thinking-/Tool-Steps).
         if (payload.type === "opencode") {
           window.dispatchEvent(new MessageEvent("smarttable:opencode", { data: event.data }));
+          return;
+        }
+        if (payload.type === "opencode_step") {
+          window.dispatchEvent(new MessageEvent("smarttable:opencode_step", { data: event.data }));
           return;
         }
         if (payload.type !== "message") return;

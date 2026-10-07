@@ -34,6 +34,7 @@
 package handler
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -711,8 +712,168 @@ func (h *Server) DeleteApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter
 }
 
 type openCodePart struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	ID     string             `json:"id,omitempty"`
+	Type   string             `json:"type"`
+	Text   string             `json:"text,omitempty"`
+	CallID string             `json:"callID,omitempty"`
+	Tool   string             `json:"tool,omitempty"`
+	State  *openCodeToolState `json:"state,omitempty"`
+}
+
+// openCodeToolState bildet den Tool-Status ab (OpenCode v1.17/v1.18, verifiziert
+// per Spike gegen `opencode serve --port 18082` + GET /doc, 2026-10-07):
+// status pending|running|completed|error, dazu input/output/title/error.
+// Felder sind bewusst tolerant (Pointer/RawMessage): Unbekanntes wird
+// ignoriert, der Finaltext-Pfad darf nie an Steps scheitern.
+type openCodeToolState struct {
+	Status string          `json:"status"`
+	Input  json.RawMessage `json:"input,omitempty"`
+	Output string          `json:"output,omitempty"`
+	Title  string          `json:"title,omitempty"`
+	Error  string          `json:"error,omitempty"`
+}
+
+// openCodeStepView ist der WS-Vertrag für Live-Steps (transient, keine DB,
+// keine OpenAPI-Änderung):
+//
+//	{"type":"opencode_step","session_id":int,
+//	 "step":{"key":string,"kind":"reasoning|tool|status",
+//	         "label":string,"status":"running|done|error",
+//	         "detail?":string,"tool?":string}}
+//
+// key ist stabil pro Step (tool:<callID>, reasoning:<partID>), damit das
+// Frontend updaten statt duplizieren kann. detail ist backend-seitig auf
+// openCodeStepDetailLimit gekürzt. Done-Semantik: Das bestehende
+// type:"opencode"-Event mit der finalen Assistant-Nachricht gilt als
+// Fertig-Signal (kein zweites opencode_done-Event).
+type openCodeStepView struct {
+	Key    string `json:"key"`
+	Kind   string `json:"kind"`
+	Label  string `json:"label"`
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
+	Tool   string `json:"tool,omitempty"`
+}
+
+// openCodeStepDetailLimit begrenzt Step-Details (Input/Output/Reasoning).
+const openCodeStepDetailLimit = 500
+
+// openCodeTruncate kürzt auf max. limit Runen + Hinweis.
+func openCodeTruncate(s string, limit int) string {
+	s = strings.TrimSpace(s)
+	if limit <= 0 || len([]rune(s)) <= limit {
+		return s
+	}
+	runes := []rune(s)
+	return strings.TrimSpace(string(runes[:limit])) + " … (gekürzt)"
+}
+
+// openCodeToolLabel mappt MCP-Tool-Namen auf lesbare Labels. Unbekannte Tools:
+// smarttable_-Präfix entfernen, Unterstriche zu Leerzeichen.
+func openCodeToolLabel(tool string) string {
+	name := strings.TrimPrefix(strings.TrimSpace(tool), "smarttable_")
+	switch name {
+	case "get_schedule":
+		return "Ruft Stundenplan ab"
+	case "get_substitutions":
+		return "Ruft Vertretungen ab"
+	case "get_homework":
+		return "Ruft Hausaufgaben ab"
+	case "get_learning_plan":
+		return "Durchsucht LehrplanPLUS"
+	case "get_vocabularies":
+		return "Ruft Vokabeln ab"
+	case "question":
+		return "Stellt Rückfrage"
+	case "":
+		return "Tool"
+	default:
+		return strings.ReplaceAll(name, "_", " ")
+	}
+}
+
+// openCodeSteps mappt OpenCode-Parts auf anzeigbare Steps (rein, testbar).
+// text/step-start/step-finish/unbekannte Typen werden defensiv übersprungen
+// (nie Fehler, leere Parts → leere Steps, Finaltext-Pfad unangetastet).
+func openCodeSteps(parts []openCodePart) []openCodeStepView {
+	out := []openCodeStepView{}
+	for i, p := range parts {
+		switch p.Type {
+		case "reasoning":
+			if strings.TrimSpace(p.Text) == "" {
+				continue
+			}
+			key := p.ID
+			if key == "" {
+				key = "reasoning:" + strconv.Itoa(i)
+			} else {
+				key = "reasoning:" + key
+			}
+			out = append(out, openCodeStepView{
+				Key:    key,
+				Kind:   "reasoning",
+				Label:  "Gedankengang",
+				Status: "done",
+				Detail: openCodeTruncate(p.Text, openCodeStepDetailLimit),
+			})
+		case "tool":
+			key := p.CallID
+			if key == "" {
+				key = p.ID
+			}
+			if key == "" {
+				key = "tool:" + strconv.Itoa(i)
+			} else {
+				key = "tool:" + key
+			}
+			status := "running"
+			detail := ""
+			if p.State != nil {
+				switch p.State.Status {
+				case "completed":
+					status = "done"
+					if strings.TrimSpace(p.State.Output) != "" {
+						detail = openCodeTruncate(p.State.Output, openCodeStepDetailLimit)
+					} else if len(p.State.Input) > 0 {
+						detail = openCodeTruncate(string(p.State.Input), openCodeStepDetailLimit)
+					}
+				case "error":
+					status = "error"
+					if strings.TrimSpace(p.State.Error) != "" {
+						detail = openCodeTruncate(p.State.Error, openCodeStepDetailLimit)
+					}
+				default: // pending|running|unbekannt → running
+					status = "running"
+					if len(p.State.Input) > 0 {
+						detail = openCodeTruncate(string(p.State.Input), openCodeStepDetailLimit)
+					}
+				}
+			}
+			if strings.TrimSpace(p.State.GetTitle()) != "" && detail == "" {
+				detail = openCodeTruncate(p.State.GetTitle(), openCodeStepDetailLimit)
+			}
+			out = append(out, openCodeStepView{
+				Key:    key,
+				Kind:   "tool",
+				Label:  openCodeToolLabel(p.Tool),
+				Status: status,
+				Detail: detail,
+				Tool:   p.Tool,
+			})
+		default:
+			// text, step-start, step-finish, snapshot, agent, ... → kein Step.
+			continue
+		}
+	}
+	return out
+}
+
+// GetTitle ist ein nil-sicherer Zugriff auf State.Title.
+func (s *openCodeToolState) GetTitle() string {
+	if s == nil {
+		return ""
+	}
+	return s.Title
 }
 
 // PostApiV1IntegrationsOpencodeSessionsIdMessages schickt den User-Prompt an
@@ -790,11 +951,19 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.Response
 	if model := openCodeModelPayload(h.openCodeModel()); model != nil {
 		msgBody["model"] = model
 	}
+	// Live-Steps: Parallel zur blockierenden OpenCode-Anfrage den SSE-Stream
+	// GET {base}/event?directory=<workspace> tailen und Step-Events an den
+	// Owner pushen (transient, keine DB). An den Request-Context gekoppelt:
+	// Client-Disconnect/Timeout beendet den Tail. Fehler nur loggen —
+	// Fallback ist der heutige Spinner + Finaltext.
+	streamCtx, stopStream := context.WithCancel(r.Context())
+	go h.openCodeStreamSteps(streamCtx, base, s.Workspace, s.OpencodeID, id, c.UserID)
 	msgCtx, msgCancel := context.WithTimeout(r.Context(), 90*time.Second)
 	status, raw, err := openCodeDo(msgCtx, openCodeClient(), http.MethodPost,
 		base+"/session/"+url.PathEscape(s.OpencodeID)+"/message?directory="+url.QueryEscape(s.Workspace),
 		msgBody)
 	msgCancel()
+	stopStream()
 	if err != nil {
 		openCodeUnreachable(w, base)
 		return
@@ -827,6 +996,14 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.Response
 	reply := strings.Join(texts, "\n\n")
 	if reply == "" {
 		reply = "Ich habe dazu leider keine Antwort erhalten — versuch es anders zu formulieren."
+	}
+
+	// Finale Steps aus der synchronen Antwort ableiten und pushen: Damit sieht
+	// das Frontend die Timeline auch dann, wenn der SSE-Tail nichts geliefert
+	// hat (WS-Reconnect, SSE-Fehler, kurze Generierung). Keys sind stabil —
+	// doppelte Events updatet das Frontend statt zu duplizieren.
+	for _, step := range openCodeSteps(answer.Parts) {
+		h.sendOpenCodeStep(c.UserID, id, step)
 	}
 
 	tx, err := h.DB.BeginTx(r.Context(), nil)
@@ -876,6 +1053,223 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.Response
 	}
 
 	writeJSON(w, http.StatusCreated, []api.OpenCodeMessage{userMsg, asstMsg})
+}
+
+// sendOpenCodeStep pusht einen Step transient an den Owner (keine DB).
+// h.Hub kann in Tests nil sein — dann No-Op.
+func (h *Server) sendOpenCodeStep(userID, backendSessionID int, step openCodeStepView) {
+	if h.Hub == nil {
+		return
+	}
+	payload, err := json.Marshal(struct {
+		Type      string           `json:"type"`
+		SessionID int              `json:"session_id"`
+		Step      openCodeStepView `json:"step"`
+	}{Type: "opencode_step", SessionID: backendSessionID, Step: step})
+	if err != nil {
+		return
+	}
+	h.Hub.SendToUser(userID, payload)
+}
+
+// openCodeStreamSteps tailt während einer laufenden Generierung den
+// OpenCode-SSE-Stream GET {base}/event?directory=<workspace> und pusht daraus
+// opencode_step-Events an den Owner.
+//
+// Spike-Ergebnis (opencode v1.17.20, GET /doc, 2026-10-07 — v1.18.32 im
+// Deploy weicht nur in Details ab, Parsing bleibt defensiv):
+//   - Events: message.part.updated (vollständiger Part), message.part.delta
+//     (inkrementelles Text-Delta), session.idle (Generierung fertig).
+//   - Parts: text|reasoning|tool|step-start|step-finish|...; Tool-State mit
+//     status pending|running|completed|error (+input/output/title/error).
+//   - GET /session/{id}/message liefert [{info, parts}] (Polling-Alternative,
+//     hier nicht nötig — SSE ist inkrementell, Polling wäre gröber).
+//
+// Vorgaben: an ctx gekoppelt (Client-Disconnect/Timeout beendet den Tail),
+// Rate max ~2/s (500-ms-Fenster, Deltas gebündelt), Fehler nur loggen —
+// der Finaltext-Pfad (POST-Antwort + finale Steps) darf nie brechen.
+func (h *Server) openCodeStreamSteps(ctx context.Context, base, workspace, targetOpencodeID string, backendSessionID, ownerID int) {
+	streamURL := base + "/event?directory=" + url.QueryEscape(workspace)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
+	if err != nil {
+		log.Printf("opencode: Step-Stream Anfrage fehlgeschlagen: %v", err)
+		return
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	resp, err := openCodeClient().Do(req)
+	if err != nil {
+		log.Printf("opencode: Step-Stream Verbindung fehlgeschlagen: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("opencode: Step-Stream Status %d", resp.StatusCode)
+		return
+	}
+
+	type sseEnvelope struct {
+		Type       string          `json:"type"`
+		Properties json.RawMessage `json:"properties"`
+	}
+	type partUpdatedProps struct {
+		SessionID string       `json:"sessionID"`
+		Part      openCodePart `json:"part"`
+	}
+	type partDeltaProps struct {
+		SessionID string `json:"sessionID"`
+		PartID    string `json:"partID"`
+		Delta     string `json:"delta"`
+	}
+	type idleProps struct {
+		SessionID string `json:"sessionID"`
+	}
+
+	pending := map[string]openCodeStepView{}
+	deltaBuf := map[string]*strings.Builder{}
+	lastSend := time.Now()
+	flush := func() {
+		if len(pending) == 0 {
+			return
+		}
+		for _, step := range pending {
+			h.sendOpenCodeStep(ownerID, backendSessionID, step)
+		}
+		pending = map[string]openCodeStepView{}
+		lastSend = time.Now()
+	}
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	done := ctx.Done()
+
+	scanner := newSSEScanner(resp.Body)
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			flush()
+		default:
+		}
+		raw, ok := scanner.next(done)
+		if !ok {
+			flush()
+			return
+		}
+		if len(raw) == 0 {
+			continue // leeres/Heartbeat-Frame
+		}
+		var env sseEnvelope
+		if err := json.Unmarshal(raw, &env); err != nil {
+			continue // defensiv: unbekannte Frames überspringen
+		}
+		switch env.Type {
+		case "message.part.updated":
+			var props partUpdatedProps
+			if err := json.Unmarshal(env.Properties, &props); err != nil {
+				continue
+			}
+			if props.SessionID != targetOpencodeID {
+				continue
+			}
+			for _, step := range openCodeSteps([]openCodePart{props.Part}) {
+				pending[step.Key] = step
+			}
+			// Tool-Start auch dann sichtbar machen, wenn der Part noch keinen
+			// anzeigbaren Step ergab (z. B. leerer Reasoning-Anfang): kein
+			// generischer Spam — nur echte Parts mappen.
+		case "message.part.delta":
+			var props partDeltaProps
+			if err := json.Unmarshal(env.Properties, &props); err != nil {
+				continue
+			}
+			if props.SessionID != targetOpencodeID || props.Delta == "" {
+				continue
+			}
+			buf, ok := deltaBuf[props.PartID]
+			if !ok {
+				buf = &strings.Builder{}
+				deltaBuf[props.PartID] = buf
+			}
+			buf.WriteString(props.Delta)
+			pending["reasoning:"+props.PartID] = openCodeStepView{
+				Key:    "reasoning:" + props.PartID,
+				Kind:   "reasoning",
+				Label:  "Gedankengang",
+				Status: "running",
+				Detail: openCodeTruncate(buf.String(), openCodeStepDetailLimit),
+			}
+		case "session.idle":
+			var props idleProps
+			if err := json.Unmarshal(env.Properties, &props); err != nil {
+				continue
+			}
+			if props.SessionID != targetOpencodeID {
+				continue
+			}
+			flush()
+			return
+		default:
+			continue
+		}
+		if time.Since(lastSend) >= 500*time.Millisecond {
+			flush()
+		}
+	}
+}
+
+// sseScanner liest data:-Frames aus einem text/event-stream.
+type sseScanner struct {
+	reader *bufio.Reader
+}
+
+func newSSEScanner(r io.Reader) *sseScanner {
+	return &sseScanner{reader: bufio.NewReaderSize(r, 64*1024)}
+}
+
+// next gibt den nächsten data-Payload zurück (konkateniert bei multi-data).
+// ok==false bei EOF/Fehler/Abbruch — der Aufrufer flusht und beendet dann.
+// Leere Frames (Heartbeat) kommen als (nil, true) zurück und werden vom
+// Aufrufer übersprungen.
+func (s *sseScanner) next(done <-chan struct{}) (raw []byte, ok bool) {
+	var dataLines []string
+	for {
+		select {
+		case <-done:
+			return nil, false
+		default:
+		}
+		// Blockierendes Read endet via ctx-Cancel des HTTP-Requests
+		// (Connection-Close) — kein extra Timeout nötig.
+		line, err := s.reader.ReadString('\n')
+		if err != nil {
+			if len(dataLines) == 0 {
+				return nil, false
+			}
+			break
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			if len(dataLines) > 0 {
+				break
+			}
+			continue
+		}
+		if strings.HasPrefix(line, ":") {
+			continue // Kommentar/Heartbeat
+		}
+		if strings.HasPrefix(line, "data:") {
+			dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		}
+		// event:/id:/retry: ignorieren — nur data zählt.
+	}
+	joined := strings.Join(dataLines, "\n")
+	if strings.TrimSpace(joined) == "" {
+		return nil, true // leeres Frame: weiter (ok=true, raw=nil → skip)
+	}
+	if strings.TrimSpace(joined) == "[DONE]" {
+		return nil, false
+	}
+	return []byte(joined), true
 }
 
 // opencodeSessionIDParam liest {id} (chi) für manuell registrierte Routen.

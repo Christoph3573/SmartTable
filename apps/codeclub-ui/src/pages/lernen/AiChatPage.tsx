@@ -11,13 +11,68 @@ import { formatDate } from "../../lib/format";
 type OpenCodeSession = components["schemas"]["OpenCodeSession"];
 type OpenCodeMessage = components["schemas"]["OpenCodeMessage"];
 type WsOpenCodeEvent = { type: "opencode"; session_id: number; message: OpenCodeMessage };
+// Transiente Live-Steps vom Backend (WS-Vertrag, keine Persistenz):
+// {type:"opencode_step", session_id, step:{key,kind,label,status,detail?,tool?}}.
+// key ist stabil pro Step — das Frontend updatet statt zu duplizieren.
+type ChatStep = {
+  key: string;
+  kind: "reasoning" | "tool" | "status" | string;
+  label: string;
+  status: "running" | "done" | "error" | string;
+  detail?: string;
+  tool?: string;
+};
+type WsOpenCodeStepEvent = { type: "opencode_step"; session_id: number; step: ChatStep };
 
 type ChatBubble = {
   id: string;
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  // steps ist nur transient (laufende/abgeschlossene Generierung im Speicher,
+  // kein Reload-Verlauf); pending markiert die noch unfertige KI-Antwort.
+  steps?: ChatStep[];
+  pending?: boolean;
 };
+
+/**
+ * Kompakte Step-Timeline über der Assistant-Bubble (transient, kein Verlauf).
+ * Laufend = Spinner + Label, fertig = ✓, Fehler = ⚠; Details (gekürzt,
+ * Plain-Text, kein Markdown) erst per Expand. Styling nah an den Bubbles,
+ * Dark-Mode beachten.
+ */
+function StepTimeline({ steps }: { steps: ChatStep[] }) {
+  if (!steps.length) return null;
+  return (
+    <ul className="mb-2 space-y-1 border-b border-gray-100 pb-2 dark:border-gray-700" aria-live="polite">
+      {steps.map((step) => (
+        <li key={step.key} className="text-xs">
+          <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+            {step.status === "running" ? (
+              <span className="loader loader-xs" aria-hidden="true" />
+            ) : step.status === "error" ? (
+              <span aria-hidden="true" className="text-red-500">⚠</span>
+            ) : (
+              <span aria-hidden="true" className="text-green-600 dark:text-green-400">✓</span>
+            )}
+            <span className="font-medium">{step.label}</span>
+            {step.status === "running" && <span className="text-gray-400">…</span>}
+          </div>
+          {step.detail && (
+            <details className="ml-5 mt-0.5">
+              <summary className="cursor-pointer text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                Details
+              </summary>
+              <p className="mt-0.5 whitespace-pre-wrap break-words text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                {step.detail}
+              </p>
+            </details>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
  * KI-Lernchat: Der Browser spricht ausschließlich mit dem Go-Backend
@@ -114,10 +169,13 @@ export function AiChatPage() {
     };
   }, [activeId]);
 
-  // WebSocket-Events (type "opencode") der aktiven Session einpflegen —
+  // WebSocket-Events der aktiven Session einpflegen —
   // z. B. wenn die Antwort über einen anderen Tab ausgelöst wurde.
+  // Strikt nach session_id == activeId filtern (Multi-Tab, Session-Wechsel,
+  // Löschen während Generierung). Das finale "opencode"-Event ist das
+  // Fertig-Signal und löst die Pending-Bubble auf.
   useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
+    const onDone = (event: MessageEvent) => {
       let payload: WsOpenCodeEvent;
       try {
         payload = JSON.parse(event.data);
@@ -131,10 +189,55 @@ export function AiChatPage() {
         content: payload.message.content,
         created_at: payload.message.created_at,
       };
-      setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incoming.id)) return prev;
+        const pending = prev.find((m) => m.pending && m.role === "assistant");
+        if (pending?.steps?.length) incoming.steps = pending.steps;
+        return [...prev.filter((m) => !m.pending), incoming];
+      });
     };
-    window.addEventListener("smarttable:opencode", onMessage as EventListener);
-    return () => window.removeEventListener("smarttable:opencode", onMessage as EventListener);
+    const onStep = (event: MessageEvent) => {
+      let payload: WsOpenCodeStepEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (payload?.type !== "opencode_step" || payload.session_id !== activeId || !payload.step?.key) return;
+      const step = payload.step;
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.pending && m.role === "assistant");
+        if (idx === -1) {
+          // Kein lokaler Pending-Eintrag (z. B. anderer Tab hat gesendet):
+          // transienten Platzhalter anlegen, damit die Timeline sichtbar ist.
+          return [
+            ...prev,
+            {
+              id: `pending-${Date.now()}`,
+              role: "assistant",
+              content: "",
+              created_at: new Date().toISOString(),
+              pending: true,
+              steps: [step],
+            },
+          ];
+        }
+        const next = prev.slice();
+        const current = next[idx].steps ?? [];
+        const stepIdx = current.findIndex((s) => s.key === step.key);
+        next[idx] = {
+          ...next[idx],
+          steps: stepIdx === -1 ? [...current, step] : current.map((s, i) => (i === stepIdx ? step : s)),
+        };
+        return next;
+      });
+    };
+    window.addEventListener("smarttable:opencode", onDone as EventListener);
+    window.addEventListener("smarttable:opencode_step", onStep as EventListener);
+    return () => {
+      window.removeEventListener("smarttable:opencode", onDone as EventListener);
+      window.removeEventListener("smarttable:opencode_step", onStep as EventListener);
+    };
   }, [activeId]);
 
   // Fallback-Polling: Verlauf alle 5s nachladen, solange die Seite offen ist
@@ -152,7 +255,15 @@ export function AiChatPage() {
             const fresh = res.data
               .filter((m) => !known.has(String(m.id)))
               .map((m) => ({ id: String(m.id), role: m.role, content: m.content, created_at: m.created_at }));
-            return fresh.length ? [...prev, ...fresh] : prev;
+            if (!fresh.length) return prev;
+            // Falls die finale Antwort nur via Polling ankam (WS verpasst),
+            // Pending-Bubble auflösen und Steps an die finale Bubble heften.
+            const pending = prev.find((m) => m.pending && m.role === "assistant");
+            if (pending?.steps?.length) {
+              const firstAssistant = fresh.find((m) => m.role === "assistant");
+              if (firstAssistant) (firstAssistant as ChatBubble).steps = pending.steps;
+            }
+            return [...prev.filter((m) => !m.pending), ...fresh];
           })
         )
         .catch(() => {});
@@ -253,6 +364,15 @@ export function AiChatPage() {
       }
     }
     push("user", question);
+    // Pending-Assistant-Eintrag mit leerer Step-Timeline anlegen — eintreffende
+    // opencode_step-Events (session_id == activeId) pflegen sich dort ein.
+    // Bleiben sie aus (WS-Reconnect, lokaler Modus), bleibt der
+    // „Lern-KI schreibt …"-Spinner als Fallback sichtbar.
+    const pendingId = `pending-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: pendingId, role: "assistant", content: "", created_at: new Date().toISOString(), pending: true, steps: [] },
+    ]);
     setSending(true);
     try {
       const res = await apiClient.post<OpenCodeMessage[]>(
@@ -262,17 +382,28 @@ export function AiChatPage() {
       const reply = res.data.find((m) => m.role === "assistant");
       if (reply) {
         setMessages((prev) => {
-          const withoutOptimisticUser = prev.slice(0, -1);
-          const known = new Set(withoutOptimisticUser.map((m) => m.id));
-          const fresh = res.data
+          const pending = prev.find((m) => m.id === pendingId);
+          // Optimistische User-Bubble(n) (nicht-numerische ID) + eigenes
+          // Pending entfernen, bestätigte Nachrichten anhängen; gesammelte
+          // Steps an die finale Bubble heften.
+          const trimmed = prev.filter(
+            (m) => m.id !== pendingId && (m.role !== "user" || /^\d+$/.test(m.id))
+          );
+          const known = new Set(trimmed.map((m) => m.id));
+          const fresh: ChatBubble[] = res.data
             .filter((m) => !known.has(String(m.id)))
             .map((m) => ({ id: String(m.id), role: m.role, content: m.content, created_at: m.created_at }));
-          return [...withoutOptimisticUser, ...fresh];
+          const firstAssistant = fresh.find((m) => m.role === "assistant");
+          if (firstAssistant && pending?.steps?.length) firstAssistant.steps = pending.steps;
+          return [...trimmed, ...fresh];
         });
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== pendingId));
       }
       refreshSessions();
     } catch {
       await refreshStatus();
+      setMessages((prev) => prev.filter((m) => m.id !== pendingId));
       push("assistant", await localAnswer(question));
     } finally {
       setSending(false);
@@ -373,6 +504,12 @@ export function AiChatPage() {
             ) : (
               messages.map((message) => {
                 const own = message.role === "user";
+                // Pending-Bubble erst rendern, sobald Steps da sind oder der
+                // Finaltext steht — vorher gilt der Fallback-Spinner unten.
+                if (!own && message.pending && !message.content && !(message.steps && message.steps.length > 0)) {
+                  return null;
+                }
+                const pendingRunning = !own && message.pending && !message.content;
                 return (
                   <div className={`max-w-[80%] ${own ? "self-end" : "self-start"}`} key={message.id}>
                     <p className={`mb-1 px-1 text-[11px] font-medium ${own ? "text-right text-green-700" : "text-gray-500"}`}>
@@ -385,8 +522,11 @@ export function AiChatPage() {
                           : "rounded-bl-sm bg-white text-gray-800 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700"
                       }`}
                     >
+                      {!own && message.steps && message.steps.length > 0 && <StepTimeline steps={message.steps} />}
                       {own ? (
                         <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      ) : pendingRunning ? (
+                        <p className="text-gray-500 dark:text-gray-400">Antwort läuft …</p>
                       ) : (
                         <Markdown
                           content={message.content}
@@ -401,7 +541,10 @@ export function AiChatPage() {
                 );
               })
             )}
-            {sending && (
+            {/* Fallback-Spinner, solange keine Step-Events eintreffen (z. B.
+                WS-Reconnect, lokaler Modus). Sobald die Timeline sichtbar ist,
+                zeigt sie den Fortschritt selbst. */}
+            {sending && !messages.some((m) => m.pending && m.steps && m.steps.length > 0) && (
               <div className="flex items-center gap-2 self-start text-sm text-gray-500">
                 <span className="loader" aria-hidden="true" /> Lern-KI schreibt …
               </div>
