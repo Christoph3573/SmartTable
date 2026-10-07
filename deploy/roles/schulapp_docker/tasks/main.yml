@@ -129,8 +129,15 @@
     delete: true
   become: false
 
-- name: Alte exited Container aufräumen (migrate-Container etc.)
-  ansible.builtin.command: docker container prune -f
+- name: Alten migrate One-Shot entfernen (gezielt statt globalem prune)
+  # Kein `docker container prune -f` direkt vor `compose up --force-recreate`:
+  # das löscht Container während Compose gerade Ersatz-Container mit
+  # Temp-Namen anlegt und triggert im docker_compose_v2-Modul den Race
+  # "No such container: <tmp-id>" beim Recreate (compose 5.x).
+  ansible.builtin.shell: docker ps -aq --filter status=exited --filter name=migrate | xargs -r docker rm
+  changed_when: false
+  failed_when: false
+  register: migrate_cleanup
 
 - name: Docker-Compose ausführen (bauen + starten)
   community.docker.docker_compose_v2:
@@ -139,8 +146,14 @@
       - "{{ schulapp_env_file }}"
     state: present
     build: always
-    recreate: always
+    # auto statt always: recreatet nur bei Image-/Config-Änderung, kein
+    # --force-recreate aller Container -> kleineres Replace-Fenster.
+    recreate: auto
   register: compose_result
+  # Recreate-Race (No such container) ist transient -> einfach retryen.
+  retries: 3
+  delay: 15
+  until: compose_result is succeeded
 
 - name: Warten bis Backend bereit ist (Health-Check)
   ansible.builtin.uri:
