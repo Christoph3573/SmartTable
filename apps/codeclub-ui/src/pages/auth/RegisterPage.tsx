@@ -102,7 +102,7 @@ export function RegisterPage() {
 
           {error && <div className="rounded-lg border border-red-200/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">{error}</div>}
 
-          <button type="submit" disabled={pending} className="mt-2 w-full rounded-lg bg-green-500 px-4 py-2.5 text-sm font-semibold text-green-950 transition-colors hover:bg-green-400 disabled:opacity-50">
+          <button type="submit" disabled={pending} style={{ backgroundImage: "none" }} className="mt-2 w-full rounded-lg border-0 bg-green-500 bg-none px-4 py-2.5 text-sm font-semibold text-green-950 shadow-none transition-colors hover:bg-green-500 disabled:opacity-50">
             {pending ? "Wird erstellt …" : "Registrieren"}
           </button>
         </form>
