@@ -80,6 +80,8 @@ export function LoginPage() {
           </Button>
         </form>
 
+        <div aria-hidden className="h-4" />
+
         <p className="mt-6 text-center text-sm text-green-100/80">
           Noch kein Konto? <Link className="font-semibold text-white hover:underline" to="/register">Konto erstellen</Link>
         </p>
