@@ -108,6 +108,22 @@ export function KursePage() {
     mutationFn: coursesApi.select,
     onSuccess: () => client.invalidateQueries({ queryKey: ["courses"] }),
   });
+  const selectAll = useMutation({
+    mutationFn: async ({ courses, selected }: { courses: AvailableCourse[]; selected: boolean }) => {
+      await Promise.all(
+        courses.map((course) =>
+          coursesApi.select({
+            provider: course.provider,
+            external_key: course.external_key,
+            name: course.name,
+            short: course.short,
+            selected,
+          }),
+        ),
+      );
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ["courses"] }),
+  });
   const remove = useMutation({
     mutationFn: coursesApi.remove,
     onSuccess: () => client.invalidateQueries({ queryKey: ["courses"] }),
@@ -124,6 +140,9 @@ export function KursePage() {
       short: course.short,
       selected,
     });
+
+  const toggleAll = (courses: AvailableCourse[], selected: boolean) =>
+    selectAll.mutate({ courses, selected });
 
   const loading = stored.isLoading || classes.isLoading || subjects.isLoading;
   const error = stored.isError;
@@ -150,6 +169,8 @@ export function KursePage() {
             courses={smartTableAvailable.data ?? []}
             isSelected={isSelected}
             onToggle={toggle}
+            onToggleAll={toggleAll}
+            bulkPending={selectAll.isPending}
             loading={smartTableAvailable.isLoading}
           />
           <CourseGroup
@@ -158,6 +179,8 @@ export function KursePage() {
             courses={external.isError ? [] : schoolConnectAvailable}
             isSelected={isSelected}
             onToggle={toggle}
+            onToggleAll={toggleAll}
+            bulkPending={selectAll.isPending}
             loading={external.isLoading}
             emptyHint={
               external.isError
@@ -234,6 +257,8 @@ function CourseGroup({
   courses,
   isSelected,
   onToggle,
+  onToggleAll,
+  bulkPending,
   loading,
   emptyHint,
 }: {
@@ -242,14 +267,36 @@ function CourseGroup({
   courses: AvailableCourse[];
   isSelected: (course: AvailableCourse) => boolean;
   onToggle: (course: AvailableCourse, selected: boolean) => void;
+  onToggleAll?: (courses: AvailableCourse[], selected: boolean) => void;
+  bulkPending?: boolean;
   loading: boolean;
   emptyHint?: string;
 }) {
+  const allSelected = courses.length > 0 && courses.every(isSelected);
+  const someSelected = courses.some(isSelected);
   return (
     <section className="surface overflow-hidden">
-      <div className="border-b border-gray-100 px-5 py-4">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{description}</p>
+      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{description}</p>
+        </div>
+        {onToggleAll && courses.length > 0 && (
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+            <input
+              type="checkbox"
+              className="size-4 accent-indigo-600"
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = !allSelected && someSelected;
+              }}
+              disabled={bulkPending}
+              onChange={(event) => onToggleAll(courses, event.target.checked)}
+              aria-label={allSelected ? "Alle abwählen" : "Alle auswählen"}
+            />
+            {allSelected ? "Alle abwählen" : "Alle auswählen"}
+          </label>
+        )}
       </div>
       {loading ? (
         <div className="px-5 py-6"><LoadingState label="Kurse werden geladen" /></div>
