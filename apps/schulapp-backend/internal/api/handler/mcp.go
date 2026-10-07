@@ -21,6 +21,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -295,7 +296,7 @@ func (h *Server) mcpCallTool(r *http.Request, userID int, role, name string, arg
 	case "get_homework":
 		return h.mcpHomework(r, userID, role, args)
 	case "get_learning_plan":
-		return h.mcpLearningPlan(args)
+		return h.mcpLearningPlan(r, args)
 	case "get_vocabularies":
 		return h.mcpVocab(r, userID, role, args)
 	default:
@@ -566,7 +567,9 @@ func (h *Server) mcpHomework(r *http.Request, userID int, role string, args map[
 // SchoolConnect-Proxy mit dem Tenant des Users ab und liefert das `data`-Feld.
 func (h *Server) mcpSchoolConnectData(r *http.Request, userID int, function string) (json.RawMessage, bool) {
 	target := h.schoolConnectBase() + "/api/schuelerportal/" + function
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
 	if err != nil || status != http.StatusOK {
 		return nil, false
 	}
@@ -635,7 +638,9 @@ func (h *Server) mcpSubstitutionsExternal(r *http.Request, userID int, args map[
 	if len(params) > 0 {
 		target += "?" + params.encode()
 	}
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
 	if err != nil || status != http.StatusOK {
 		return "Vertretungsplan konnte weder aus SmartTable noch aus dem Schülerportal geladen werden.", true
 	}
@@ -725,7 +730,7 @@ func mcpAnyStr(m map[string]any, keys ...string) string {
 
 // mcpLearningPlan fragt LehrplanPLUS über SchoolConnect (tenantlos,
 // öffentlich — kein Login nötig). Nutzt query-Args als Suchparameter.
-func (h *Server) mcpLearningPlan(args map[string]any) (string, bool) {
+func (h *Server) mcpLearningPlan(r *http.Request, args map[string]any) (string, bool) {
 	params := urlValues{}
 	for _, k := range []string{"schulart", "fach", "jahrgangsstufe", "lehrplankapitel", "query", "q", "search", "fachbereich"} {
 		if v := mcpStrArg(args, k); v != "" {
@@ -742,7 +747,9 @@ func (h *Server) mcpLearningPlan(args map[string]any) (string, bool) {
 	if len(params) > 0 {
 		target += "?" + params.encode()
 	}
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, target, "", nil)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, target, "", nil)
 	if err != nil {
 		return "LehrplanPLUS ist gerade nicht erreichbar.", true
 	}

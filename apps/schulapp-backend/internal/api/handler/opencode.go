@@ -35,6 +35,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -193,13 +194,25 @@ func (h *Server) openCodeWorkspaceDir(userID int) string {
 	return dir
 }
 
+// sharedOpenCodeClient wird für alle OpenCode-Aufrufe wiederverwendet
+// (Connection-Pooling); die eigentlichen Timeouts kommen aus den
+// kontextgebundenen Deadlines der einzelnen Aufrufe.
+var sharedOpenCodeClient = &http.Client{
+	Timeout: 95 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConns:        20,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
 func openCodeClient() *http.Client {
-	return &http.Client{Timeout: 120 * time.Second}
+	return sharedOpenCodeClient
 }
 
 // openCodeDo schickt JSON an OpenCode und gibt Statuscode + Body (max 8 MB)
-// zurück.
-func openCodeDo(client *http.Client, method, rawURL string, body any) (int, []byte, error) {
+// zurück. Der übergebene Kontext trägt die pro-Aufruf-Deadline.
+func openCodeDo(ctx context.Context, client *http.Client, method, rawURL string, body any) (int, []byte, error) {
 	var reader io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
@@ -208,7 +221,7 @@ func openCodeDo(client *http.Client, method, rawURL string, body any) (int, []by
 		}
 		reader = bytes.NewReader(raw)
 	}
-	req, err := http.NewRequest(method, rawURL, reader)
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, reader)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -301,7 +314,9 @@ func (h *Server) GetApiV1IntegrationsOpencodeStatus(w http.ResponseWriter, r *ht
 		return
 	}
 	base := h.openCodeBase()
-	status, _, err := openCodeDo(openCodeClient(), http.MethodGet, base+"/global/health", nil)
+	statusCtx, statusCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	status, _, err := openCodeDo(statusCtx, openCodeClient(), http.MethodGet, base+"/global/health", nil)
+	statusCancel()
 	if err != nil || status != http.StatusOK {
 		writeJSON(w, http.StatusOK, api.OpenCodeStatus{
 			Configured: true,
@@ -332,8 +347,10 @@ func (h *Server) GetApiV1IntegrationsOpencodeMcpStatus(w http.ResponseWriter, r 
 	workspace := h.openCodeWorkspaceDir(c.UserID)
 	mcpURL := h.openCodeMCPURL()
 
-	status, raw, err := openCodeDo(openCodeClient(), http.MethodGet,
+	mcpCtx, mcpCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	status, raw, err := openCodeDo(mcpCtx, openCodeClient(), http.MethodGet,
 		base+"/mcp?directory="+url.QueryEscape(workspace), nil)
+	mcpCancel()
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"reachable": false, "connected": false, "mcp_url": mcpURL, "hint": openCodeHint,
@@ -353,7 +370,9 @@ func (h *Server) GetApiV1IntegrationsOpencodeMcpStatus(w http.ResponseWriter, r 
 
 	if _, ok := servers["smarttable"]; !ok {
 		if token, terr := h.openCodeSessionTokenQuiet(r, c.UserID); terr == nil {
-			regStatus, regRaw, regErr := h.openCodeAddMCP(base, workspace, token)
+			regCtx, regCancel := context.WithTimeout(r.Context(), 10*time.Second)
+			regStatus, regRaw, regErr := h.openCodeAddMCP(regCtx, base, workspace, token)
+			regCancel()
 			switch {
 			case regErr != nil:
 				servers["register_error"] = regErr.Error()
@@ -438,9 +457,11 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r 
 	workspace := h.openCodeWorkspaceDir(c.UserID)
 	client := openCodeClient()
 
-	status, raw, err := openCodeDo(client, http.MethodPost,
+	sessCtx, sessCancel := context.WithTimeout(r.Context(), 30*time.Second)
+	status, raw, err := openCodeDo(sessCtx, client, http.MethodPost,
 		base+"/session?directory="+url.QueryEscape(workspace),
 		map[string]any{"title": title, "permission": openCodeDenyAll})
+	sessCancel()
 	if err != nil {
 		openCodeUnreachable(w, base)
 		return
@@ -476,11 +497,18 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r 
 	}
 	sessionToken, ok := h.openCodeSessionToken(w, r, c.UserID)
 	if !ok {
-		h.openCodeDeleteSession(base, workspace, created.ID)
+		delCtx, delCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		h.openCodeDeleteSession(delCtx, base, workspace, created.ID)
+		delCancel()
 		return
 	}
-	if err := h.openCodeRegisterMCP(w, base, workspace, sessionToken); err != nil {
-		h.openCodeDeleteSession(base, workspace, created.ID)
+	regCtx, regCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	regErr := h.openCodeRegisterMCP(regCtx, w, base, workspace, sessionToken)
+	regCancel()
+	if regErr != nil {
+		delCtx, delCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		h.openCodeDeleteSession(delCtx, base, workspace, created.ID)
+		delCancel()
 		return
 	}
 
@@ -491,7 +519,9 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r 
 		c.UserID, created.ID, title, workspace, nullableString(provider), nullableString(model),
 	).Scan(&id)
 	if err != nil {
-		h.openCodeDeleteSession(base, workspace, created.ID)
+		delCtx, delCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		h.openCodeDeleteSession(delCtx, base, workspace, created.ID)
+		delCancel()
 		writeError(w, http.StatusInternalServerError, "Datenbankfehler")
 		return
 	}
@@ -537,8 +567,8 @@ func (h *Server) openCodeSessionTokenQuiet(r *http.Request, userID int) (string,
 // damit auch ältere Sessions (bei denen das frühere `tools`-Feld die Rechte
 // überschrieben hatte) wieder MCP-Tools nutzen können. Best-effort: Fehler
 // werden geloggt, blockieren das Senden aber nicht.
-func (h *Server) openCodeEnsurePermissions(base, workspace, opencodeID string) error {
-	status, raw, err := openCodeDo(openCodeClient(), http.MethodPatch,
+func (h *Server) openCodeEnsurePermissions(ctx context.Context, base, workspace, opencodeID string) error {
+	status, raw, err := openCodeDo(ctx, openCodeClient(), http.MethodPatch,
 		base+"/session/"+url.PathEscape(opencodeID)+"?directory="+url.QueryEscape(workspace),
 		map[string]any{"permission": openCodeDenyAll})
 	if err != nil {
@@ -555,17 +585,17 @@ func (h *Server) openCodeEnsurePermissions(base, workspace, opencodeID string) e
 // openCodeMCPStatus liest den MCP-Status des Verzeichnisses aus OpenCode
 // (GET /mcp?directory=...) — zeigt, ob der smarttable-MCP-Server verbunden
 // ist. Genutzt von der Diagnose.
-func (h *Server) openCodeMCPStatus(workspace string) (int, []byte, error) {
-	return openCodeDo(openCodeClient(), http.MethodGet,
+func (h *Server) openCodeMCPStatus(ctx context.Context, workspace string) (int, []byte, error) {
+	return openCodeDo(ctx, openCodeClient(), http.MethodGet,
 		h.openCodeBase()+"/mcp?directory="+url.QueryEscape(workspace), nil)
 }
 
 // openCodeAddMCP registriert den Backend-MCP-Server (directory-scoped) und
 // gibt den Rohstatus zurück — ohne HTTP-Nebenwirkungen, damit sowohl die
 // Session-Anlage als auch die Diagnose ihn nutzen können.
-func (h *Server) openCodeAddMCP(base, workspace, sessionToken string) (int, []byte, error) {
+func (h *Server) openCodeAddMCP(ctx context.Context, base, workspace, sessionToken string) (int, []byte, error) {
 	mcpURL := h.openCodeMCPURL()
-	return openCodeDo(openCodeClient(), http.MethodPost,
+	return openCodeDo(ctx, openCodeClient(), http.MethodPost,
 		base+"/mcp?directory="+url.QueryEscape(workspace),
 		map[string]any{
 			"name": "smarttable",
@@ -584,8 +614,8 @@ func (h *Server) openCodeAddMCP(base, workspace, sessionToken string) (int, []by
 // das Backend im Compose-Netz; der Tenant reist als Header mit. Der von
 // OpenCode zurückgemeldete Verbindungsstatus wird geprüft: Ist der Server
 // nicht „connected", wird das geloggt (die Diagnose zeigt Details).
-func (h *Server) openCodeRegisterMCP(w http.ResponseWriter, base, workspace, sessionToken string) error {
-	status, raw, err := h.openCodeAddMCP(base, workspace, sessionToken)
+func (h *Server) openCodeRegisterMCP(ctx context.Context, w http.ResponseWriter, base, workspace, sessionToken string) error {
+	status, raw, err := h.openCodeAddMCP(ctx, base, workspace, sessionToken)
 	if err != nil {
 		openCodeUnreachable(w, base)
 		return err
@@ -627,8 +657,8 @@ func (h *Server) openCodeMCPURL() string {
 	return "http://backend:8080/api/v1/mcp"
 }
 
-func (h *Server) openCodeDeleteSession(base, workspace, opencodeID string) {
-	_, _, _ = openCodeDo(openCodeClient(), http.MethodDelete,
+func (h *Server) openCodeDeleteSession(ctx context.Context, base, workspace, opencodeID string) {
+	_, _, _ = openCodeDo(ctx, openCodeClient(), http.MethodDelete,
 		base+"/session/"+url.PathEscape(opencodeID)+"?directory="+url.QueryEscape(workspace), nil)
 }
 
@@ -674,7 +704,9 @@ func (h *Server) DeleteApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter
 		writeError(w, http.StatusInternalServerError, "Datenbankfehler")
 		return
 	}
-	h.openCodeDeleteSession(h.openCodeBase(), s.Workspace, s.OpencodeID)
+	delCtx, delCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	h.openCodeDeleteSession(delCtx, h.openCodeBase(), s.Workspace, s.OpencodeID)
+	delCancel()
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -716,7 +748,41 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.Response
 	// komplett — deshalb schicken wir es nicht mit (sonst fällt das
 	// SmartTable-Allow weg und die MCP-Tools fragen headless um Erlaubnis).
 	// Stattdessen stellen wir die Rechte per PATCH /session/{id} sicher.
-	_ = h.openCodeEnsurePermissions(base, s.Workspace, s.OpencodeID)
+	permCtx, permCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	_ = h.openCodeEnsurePermissions(permCtx, base, s.Workspace, s.OpencodeID)
+	permCancel()
+	// MCP-Preflight: Schuldaten kommen ausschließlich über den
+	// smarttable-MCP-Server — ohne verbundenen Server darf der Prompt nicht
+	// an OpenCode gehen (sonst würde die KI raten statt Tool-Daten nutzen).
+	preCtx, preCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	preStatus, preRaw, preErr := h.openCodeMCPStatus(preCtx, s.Workspace)
+	preCancel()
+	connected := false
+	if preErr == nil && preStatus == http.StatusOK {
+		preServers := map[string]any{}
+		_ = json.Unmarshal(preRaw, &preServers)
+		connected, _ = mcpServerConnected(preServers)
+	}
+	if !connected {
+		if token, terr := h.openCodeSessionTokenQuiet(r, c.UserID); terr == nil {
+			reCtx, reCancel := context.WithTimeout(r.Context(), 10*time.Second)
+			reStatus, reRaw, reErr := h.openCodeAddMCP(reCtx, base, s.Workspace, token)
+			reCancel()
+			if reErr == nil && (reStatus == http.StatusOK || reStatus == http.StatusCreated) {
+				reServers := map[string]any{}
+				_ = json.Unmarshal(reRaw, &reServers)
+				connected, _ = mcpServerConnected(reServers)
+			}
+		}
+	}
+	if !connected {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"error": "MCP-Server smarttable nicht verbunden",
+			"code":  "mcp_disconnected",
+			"hint":  openCodeHint,
+		})
+		return
+	}
 	msgBody := map[string]any{
 		"system": openCodeSystemPrompt,
 		"parts":  []map[string]string{{"type": "text", "text": content}},
@@ -724,9 +790,11 @@ func (h *Server) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.Response
 	if model := openCodeModelPayload(h.openCodeModel()); model != nil {
 		msgBody["model"] = model
 	}
-	status, raw, err := openCodeDo(openCodeClient(), http.MethodPost,
+	msgCtx, msgCancel := context.WithTimeout(r.Context(), 90*time.Second)
+	status, raw, err := openCodeDo(msgCtx, openCodeClient(), http.MethodPost,
 		base+"/session/"+url.PathEscape(s.OpencodeID)+"/message?directory="+url.QueryEscape(s.Workspace),
 		msgBody)
+	msgCancel()
 	if err != nil {
 		openCodeUnreachable(w, base)
 		return

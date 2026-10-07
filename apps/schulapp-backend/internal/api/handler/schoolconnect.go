@@ -34,6 +34,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -91,8 +92,10 @@ var scAllowedCalls = map[string]map[string]bool{
 	},
 }
 
+var sharedSchoolConnectClient = &http.Client{Timeout: 12 * time.Second, Transport: &http.Transport{MaxIdleConns: 20, MaxIdleConnsPerHost: 10, IdleConnTimeout: 90 * time.Second}}
+
 func schoolConnectClient() *http.Client {
-	return &http.Client{Timeout: 20 * time.Second}
+	return sharedSchoolConnectClient
 }
 
 // schoolConnectBase liefert die konfigurierte SchoolConnect-Adresse
@@ -114,7 +117,7 @@ func (h *Server) schoolConnectBase() string {
 // gesetzt (aus der JWT-user_id, nie aus Client-Parametern); ist
 // SC_TENANT_SHARED_SECRET konfiguriert, wird zusätzlich X-SC-Tenant-Sig
 // (HMAC-SHA256 über den Tenant, Hex) gesetzt.
-func schoolConnectDo(client *http.Client, method, rawURL string, tenant string, body any) (int, []byte, error) {
+func schoolConnectDo(ctx context.Context, client *http.Client, method, rawURL string, tenant string, body any) (int, []byte, error) {
 	var reader io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
@@ -123,7 +126,7 @@ func schoolConnectDo(client *http.Client, method, rawURL string, tenant string, 
 		}
 		reader = bytes.NewReader(raw)
 	}
-	req, err := http.NewRequest(method, rawURL, reader)
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, reader)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -179,7 +182,9 @@ func (h *Server) GetApiV1IntegrationsSchoolconnectStatus(w http.ResponseWriter, 
 		return
 	}
 	base := h.schoolConnectBase()
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodGet, base+"/api", "", nil)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, base+"/api", "", nil)
 	if err != nil || status != http.StatusOK {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"configured": true,
@@ -246,7 +251,9 @@ func (h *Server) PostApiV1IntegrationsSchoolconnectPluginAuth(w http.ResponseWri
 		writeError(w, http.StatusBadRequest, "ungültiges JSON")
 		return
 	}
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/auth", tenant, creds)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/auth", tenant, creds)
 	if err != nil {
 		schoolConnectUnreachable(w)
 		return
@@ -268,7 +275,9 @@ func (h *Server) PostApiV1IntegrationsSchoolconnectPluginLogout(w http.ResponseW
 		writeError(w, http.StatusBadRequest, "Plugin "+plugin+" braucht keine Anmeldung")
 		return
 	}
-	status, raw, err := schoolConnectDo(schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/logout", tenant, map[string]any{})
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodPost, h.schoolConnectBase()+"/api/"+plugin+"/logout", tenant, map[string]any{})
 	if err != nil {
 		schoolConnectUnreachable(w)
 		return
@@ -310,6 +319,8 @@ func (h *Server) schoolConnectCall(w http.ResponseWriter, r *http.Request, plugi
 	}
 
 	target := h.schoolConnectBase() + "/api/" + url.PathEscape(plugin) + "/" + url.PathEscape(function)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 	var status int
 	var raw []byte
 	var err error
@@ -325,12 +336,12 @@ func (h *Server) schoolConnectCall(w http.ResponseWriter, r *http.Request, plugi
 				return
 			}
 		}
-		status, raw, err = schoolConnectDo(schoolConnectClient(), http.MethodPost, target, tenant, body)
+		status, raw, err = schoolConnectDo(ctx, schoolConnectClient(), http.MethodPost, target, tenant, body)
 	} else {
 		if query := r.URL.RawQuery; query != "" {
 			target += "?" + query
 		}
-		status, raw, err = schoolConnectDo(schoolConnectClient(), http.MethodGet, target, tenant, nil)
+		status, raw, err = schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, target, tenant, nil)
 	}
 	if err != nil {
 		schoolConnectUnreachable(w)
