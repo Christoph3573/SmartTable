@@ -75,7 +75,7 @@ export function LoginPage() {
             </div>
           )}
 
-          <Button type="submit" loading={isLoading} style={{ backgroundImage: "none" }} className="mt-2 w-full border-0 bg-green-500 bg-none font-semibold text-green-950 shadow-none hover:bg-green-500 dark:bg-green-500 dark:hover:bg-green-500">
+          <Button type="submit" loading={isLoading} size="sm" style={{ backgroundImage: "none" }} className="mt-2 w-full border-0 bg-green-500 bg-none font-semibold text-green-950 shadow-none hover:bg-green-500 dark:bg-green-700 dark:text-white dark:hover:bg-green-700">
             Anmelden
           </Button>
         </form>

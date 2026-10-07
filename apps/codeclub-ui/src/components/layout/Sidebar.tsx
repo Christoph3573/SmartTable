@@ -215,7 +215,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       <div className="sidebar-header flex h-20 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
-        <img src="/icon.png" alt="" className="size-8 rounded-lg object-contain" />
+        <img src="/icon-better.png" alt="" className="size-8 rounded-lg object-contain" />
         <span className="font-bold tracking-tight text-gray-900 dark:text-white">SmartTable</span>
         <span className="ml-auto flex items-center gap-1">
           <ThemeToggle />
