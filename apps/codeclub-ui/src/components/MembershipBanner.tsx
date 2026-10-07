@@ -2,15 +2,21 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { schoolApi } from "../api/school";
 import { useAuthStore } from "../store/authStore";
+import { useSettingsStore } from "../store/settingsStore";
 
 export function MembershipBanner() {
   const user = useAuthStore((s) => s.user);
+  const provider = useSettingsStore((s) => s.provider);
   const membership = useQuery({
     queryKey: ["membership"],
     queryFn: schoolApi.membership,
     enabled: user?.role === "student",
     staleTime: 30_000,
   });
+
+  // Bei SchoolConnect kommen Klassen/Kurse aus dem Schülerportal — der
+  // SmartTable-Beitritts-Hinweis wäre irreführend und wird ausgeblendet.
+  if (provider === "schoolconnect") return null;
 
   if (user?.role !== "student" || membership.isLoading || membership.isError || !membership.data) return null;
 

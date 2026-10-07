@@ -51,12 +51,13 @@ func TestMain(m *testing.M) {
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	return &Server{
-		DB:              testDB,
-		JWTSecret:       []byte("test-secret"),
-		LoginLimiter:    NewIPRateLimiter(rate.Every(0), 1000),
-		RegisterLimiter: NewIPRateLimiter(rate.Every(0), 1000),
-		UploadDir:       t.TempDir(),
-		Hub:             ws.NewHub(),
+		DB:                   testDB,
+		JWTSecret:            []byte("test-secret"),
+		LoginLimiter:         NewIPRateLimiter(rate.Every(0), 1000),
+		RegisterLimiter:      NewIPRateLimiter(rate.Every(0), 1000),
+		UploadDir:            t.TempDir(),
+		Hub:                  ws.NewHub(),
+		SchoolConnectBaseURL: "http://127.0.0.1:1",
 	}
 }
 
@@ -69,6 +70,9 @@ func resetDB(t *testing.T) {
 		homework_submissions, homework,
 		substitutions, events,
 		files, file_folders,
+		vocab_cards, vocab_sets,
+		course_lessons, courses,
+		opencode_messages, opencode_session_tokens, opencode_sessions,
 		class_join_requests, class_teachers, class_members,
 		refresh_tokens, classes, subjects, users, schools
 		RESTART IDENTITY CASCADE`)
@@ -123,7 +127,7 @@ func addTeacher(t *testing.T, classID, userID int) {
 	}
 }
 
-func intPtr(v int) *int    { return &v }
+func intPtr(v int) *int       { return &v }
 func strPtr(v string) *string { return &v }
 
 func mustSubject(t *testing.T) int {

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS course_lessons;
+DROP TABLE IF EXISTS courses;

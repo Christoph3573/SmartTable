@@ -4,7 +4,9 @@ import { getAccessToken } from "../api/client";
 import { schoolApi, type ChatMessage } from "../api/school";
 import { useChatUiStore } from "../store/chatUiStore";
 
-type IncomingEvent = { type: "message"; message: ChatMessage };
+type IncomingEvent =
+  | { type: "message"; message: ChatMessage }
+  | { type: "opencode"; session_id: number; message: { id: number; role: string; content: string; created_at: string } };
 
 /**
  * Keeps one live WebSocket connection open for the lifetime of the app shell
@@ -33,6 +35,12 @@ export function useChatSocket() {
         try {
           payload = JSON.parse(event.data);
         } catch {
+          return;
+        }
+        // OpenCode-Antworten (KI-Lernchat) an die AiChatPage weiterreichen —
+        // sie hört auf "smarttable:opencode" und pflegt sie in den Verlauf ein.
+        if (payload.type === "opencode") {
+          window.dispatchEvent(new MessageEvent("smarttable:opencode", { data: event.data }));
           return;
         }
         if (payload.type !== "message") return;

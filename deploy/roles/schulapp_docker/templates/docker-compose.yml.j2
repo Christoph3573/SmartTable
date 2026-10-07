@@ -39,11 +39,64 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: "8080"
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      # SchoolConnect v0.3.0 als Sidecar-Service im Compose-Netz
+      # (SC_REQUIRE_TENANT=true). Der Proxy setzt X-SC-Tenant aus der
+      # JWT-user_id (pro App-Benutzer isoliert); optional HMAC via
+      # SC_TENANT_SHARED_SECRET (muss zum Sidecar passen).
+      SCHOOLCONNECT_BASE_URL: ${SCHOOLCONNECT_BASE_URL:-http://schoolconnect:8081}
+      SC_TENANT_SHARED_SECRET: ${SC_TENANT_SHARED_SECRET:-}
+      # OpenCode (KI-Lernchat, Agent-Runtime): gemeinsamer Sidecar-Service
+      # für alle User (nur internes Netz). Tenant-Trennung via
+      # /workspaces/<user_id> + Ownership-Checks im Backend (JWT-Grenze).
+      # MCP-URL aus Sicht des opencode-Containers (Compose-Netz).
+      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-http://opencode:8082}
+      OPENCODE_WORKSPACE_ROOT: /workspaces
+      OPENCODE_MCP_URL: http://backend:8080/api/v1/mcp
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-openrouter/deepseek/deepseek-v4.1-flash}
     depends_on:
       migrate:
         condition: service_completed_successfully
+      schoolconnect:
+        condition: service_healthy
+      opencode:
+        condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+      - workspaces:/workspaces
+    restart: unless-stopped
+
+  # SchoolConnect v0.3.0 Multi-Tenant als Sidecar: nur internes Netz
+  # (kein ports:, kein host-gateway). Credentials/Sessions liegen in
+  # /data (Volume sc_creds), getrennt pro Tenant (JWT-user_id).
+  schoolconnect:
+    build:
+      context: ./schoolconnect
+    environment:
+      SC_REQUIRE_TENANT: "true"
+      SC_TENANT_SHARED_SECRET: ${SC_TENANT_SHARED_SECRET:-}
+      LOG_LEVEL: ${SC_LOG_LEVEL:-info}
+    volumes:
+      - sc_creds:/data
+    restart: unless-stopped
+
+  # OpenCode (KI-Lernchat, Agent-Runtime): gemeinsamer Sidecar-Service
+  # für alle User, nur internes Netz (kein ports:). Tenant-Trennung:
+  # Backend ruft die REST-API mit ?directory=/workspaces/<user_id> auf
+  # (directory-scoped, pro User isoliert) und prüft Ownership in
+  # opencode_sessions. Modell-Key global via OPENROUTER_API_KEY (aus .env,
+  # im CI aus dem GitHub Secret OPENROUTER_API_KEY). Der Browser spricht
+  # NIE direkt mit diesem Service (JWT-Grenze=Backend).
+  opencode:
+    build:
+      context: ./opencode
+      args:
+        OPENCODE_VERSION: ${OPENCODE_VERSION:-v1.18.32}
+    environment:
+      OPENCODE_PORT: "8082"
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    volumes:
+      - workspaces:/workspaces
+      - opencode_data:/root/.local/share/opencode
     restart: unless-stopped
 
   frontend:
@@ -60,3 +113,6 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  sc_creds:
+  workspaces:
+  opencode_data:

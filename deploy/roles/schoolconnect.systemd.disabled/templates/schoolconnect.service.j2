@@ -1,0 +1,24 @@
+[Unit]
+Description=SchoolConnect REST-API (v{{ schoolconnect_version }})
+Documentation=https://github.com/Christoph3573/SchoolConnect/releases/tag/{{ schoolconnect_version }}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ schoolconnect_user }}
+Group={{ schoolconnect_user }}
+Environment=REST_ADDR={{ schoolconnect_bind }}:{{ schoolconnect_port }}
+Environment=LOG_LEVEL={{ schoolconnect_log_level }}
+{% for key, value in (schoolconnect_env_secrets | default({})).items() %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
+ExecStart={{ schoolconnect_binary }} serve
+WorkingDirectory={{ schoolconnect_dir }}
+Restart=always
+RestartSec=5
+# Credentials (Session-Store unter ~/.config/schoolconnect) nur für den
+# Service-User lesbar halten.
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

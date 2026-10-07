@@ -2,20 +2,12 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import { router } from "./router";
+import { queryClient } from "./api/queryClient";
 import { useAuthStore } from "./store/authStore";
 import { useThemeStore } from "./store/themeStore";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60,
-      retry: 1,
-    },
-  },
-});
 
 function AppRoot() {
   const initialize = useAuthStore((s) => s.initialize);

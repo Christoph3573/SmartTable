@@ -1,36 +1,35 @@
 import { create } from "zustand";
 
-export type DataSource = "proprietary" | "schoolconnect";
+export type DataProvider = "smarttable" | "schoolconnect";
 
-const STORAGE_KEY = "smarttable-data-source";
+const STORAGE_KEY = "smarttable-data-provider";
 
-function getInitialDataSource(): DataSource {
-  if (typeof window === "undefined") return "proprietary";
+function getInitialProvider(): DataProvider {
+  if (typeof window === "undefined") return "smarttable";
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "proprietary" || stored === "schoolconnect") return stored;
+    if (stored === "smarttable" || stored === "schoolconnect") return stored;
+    return "smarttable";
   } catch {
-    // localStorage nicht verfügbar -> Default verwenden
+    return "smarttable";
   }
-  return "proprietary";
 }
 
 type SettingsState = {
-  dataSource: DataSource;
-  setDataSource: (source: DataSource) => void;
+  /** Aktiver Daten-Provider für Stundenplan/Hausaufgaben/Vertretungen. */
+  provider: DataProvider;
+  setProvider: (provider: DataProvider) => void;
 };
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  dataSource: getInitialDataSource(),
+  provider: getInitialProvider(),
 
-  setDataSource: (source) => {
+  setProvider: (provider) => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, source);
+      window.localStorage.setItem(STORAGE_KEY, provider);
     } catch {
-      // nur Session anwenden, wenn localStorage nicht verfügbar ist
+      // localStorage nicht verfügbar -> nur Session anwenden
     }
-    set({ dataSource: source });
-    // Hinweis: Die Auswahl bleibt vorerst ohne Effekt (kein Backend-Aufruf,
-    // keine Änderung der Datenabfragen).
+    set({ provider });
   },
 }));

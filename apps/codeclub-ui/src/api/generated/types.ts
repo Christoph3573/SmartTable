@@ -2188,6 +2188,666 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/vocab/sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eigene Vokabelsets + Klassensets auflisten */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Vokabelsets */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VocabSet"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Vokabelset anlegen (optional einer Klasse teilen) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateVocabSetRequest"];
+                };
+            };
+            responses: {
+                /** @description Vokabelset angelegt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VocabSet"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vocab/sets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Vokabelset löschen (nur Owner, inkl. Karten) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Vokabelset gelöscht */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Vokabelset aktualisieren (nur Owner) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateVocabSetRequest"];
+                };
+            };
+            responses: {
+                /** @description Vokabelset aktualisiert */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VocabSet"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/vocab/sets/{id}/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Karten eines Vokabelsets auflisten */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Karteikarten */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VocabCard"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Karte zu einem Vokabelset hinzufügen (nur Owner) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateVocabCardRequest"];
+                };
+            };
+            responses: {
+                /** @description Karte angelegt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VocabCard"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vocab/cards/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Karte löschen (nur Owner des Sets) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Karte gelöscht */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Karte bearbeiten (nur Owner des Sets) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateVocabCardRequest"];
+                };
+            };
+            responses: {
+                /** @description Karte aktualisiert */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VocabCard"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/vocab/cards/{id}/grade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Karte bewerten (Leitner: gewusst → Box+1, sonst Box 1) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GradeVocabCardRequest"];
+                };
+            };
+            responses: {
+                /** @description Karte mit neuem Box-Stand */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VocabCard"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OpenCode-Status (Erreichbarkeit des Sidecar-Services) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Status mit reachable-Flag */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeStatus"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eigene OpenCode-Chat-Sessions auflisten */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Sessions des authentifizierten Users */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeSession"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Neue OpenCode-Chat-Session anlegen (eigener Tenant-Workspace) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateOpenCodeSessionRequest"];
+                };
+            };
+            responses: {
+                /** @description Session angelegt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeSession"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Session mit Nachrichtenverlauf abrufen (nur Owner) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Verlauf (älteste zuerst) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeMessage"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Session löschen (nur Owner, inkl. Verlauf) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Session gelöscht */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nachricht an OpenCode senden (Antwort kommt vollständig + per WebSocket-Event) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SendOpenCodeMessageRequest"];
+                };
+            };
+            responses: {
+                /** @description User-Nachricht + Agent-Antwort (Antwort vollständig) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeMessage"][];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/schoolconnect/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SchoolConnect-Status (Erreichbarkeit + verfügbare Plugins) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Status mit reachable-Flag und Pluginliste */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/schoolconnect/{plugin}/auth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bei einem SchoolConnect-Plugin anmelden (Credentials im Body) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    plugin: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Anmeldung erfolgreich (enthält nur Key-Namen, nie Secret-Werte) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/schoolconnect/{plugin}/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SchoolConnect-Session eines Plugins verwerfen */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    plugin: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Abgemeldet */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/schoolconnect/{plugin}/{function}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lesende SchoolConnect-Funktion aufrufen (Query-Params werden gereicht) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    plugin: string;
+                    function: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Result-Envelope {plugin, function, data} */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Lesende SchoolConnect-Funktion aufrufen (JSON-Body wird gereicht) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    plugin: string;
+                    function: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Result-Envelope {plugin, function, data} */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -2557,6 +3217,53 @@ export interface components {
         CreateSchoolRequest: {
             name: string;
         };
+        VocabSet: {
+            id: number;
+            owner_id: number;
+            class_id?: number;
+            title: string;
+            description?: string;
+            source_lang: string;
+            target_lang: string;
+            card_count: number;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        CreateVocabSetRequest: {
+            title: string;
+            description?: string;
+            source_lang: string;
+            target_lang: string;
+            class_id?: number;
+        };
+        UpdateVocabSetRequest: {
+            title?: string;
+            description?: string;
+            class_id?: number;
+        };
+        VocabCard: {
+            id: number;
+            set_id: number;
+            front: string;
+            back: string;
+            hint?: string;
+            box: number;
+            /** Format: date-time */
+            due_at: string;
+        };
+        CreateVocabCardRequest: {
+            front: string;
+            back: string;
+            hint?: string;
+        };
+        UpdateVocabCardRequest: {
+            front?: string;
+            back?: string;
+            hint?: string;
+        };
+        GradeVocabCardRequest: {
+            known: boolean;
+        };
         RegisterRequest: {
             /** Format: email */
             email: string;
@@ -2565,6 +3272,37 @@ export interface components {
             last_name: string;
             school_id: number;
             requested_class_id?: number;
+        };
+        OpenCodeSession: {
+            id: number;
+            title: string;
+            workspace: string;
+            model_provider?: string;
+            model_id?: string;
+            message_count: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        CreateOpenCodeSessionRequest: {
+            title?: string;
+        };
+        OpenCodeMessage: {
+            id: number;
+            /** @enum {string} */
+            role: "user" | "assistant";
+            content: string;
+            tokens?: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        SendOpenCodeMessageRequest: {
+            content: string;
+        };
+        OpenCodeStatus: {
+            configured: boolean;
+            reachable: boolean;
+            base_url?: string;
+            hint?: string;
         };
         JoinRequest: {
             id: number;

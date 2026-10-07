@@ -23,12 +23,34 @@ import (
 type Server struct {
 	api.Unimplemented
 
-	DB               *sql.DB
-	JWTSecret        []byte
-	LoginLimiter     *IPRateLimiter
-	RegisterLimiter  *IPRateLimiter
-	UploadDir        string
-	Hub              *ws.Hub
+	DB              *sql.DB
+	JWTSecret       []byte
+	LoginLimiter    *IPRateLimiter
+	RegisterLimiter *IPRateLimiter
+	UploadDir       string
+	Hub             *ws.Hub
+	// SchoolConnectBaseURL ist die Adresse der SchoolConnect-REST-API
+	// (Sidecar-Service "schoolconnect", v0.3.0 Multi-Tenant). Env
+	// SCHOOLCONNECT_BASE_URL schlägt dieses Feld; Default ist
+	// http://schoolconnect:8081 (internes Compose-Netz, siehe
+	// docker-compose.yml bzw. deploy docker-compose.yml.j2).
+	SchoolConnectBaseURL string
+	// OpenCodeBaseURL ist die Adresse von `opencode serve` (gemeinsamer
+	// Sidecar-Service "opencode" für alle User, nur internes Compose-Netz).
+	// Env OPENCODE_BASE_URL schlägt dieses Feld; Default ist
+	// http://opencode:8082. Die Multi-Tenant-Grenze bleibt das Backend:
+	// Workspaces /workspaces/<user_id> + Ownership-Checks (siehe opencode.go).
+	OpenCodeBaseURL string
+	// OpenCodeWorkspaceRoot ist das Root-Verzeichnis für Tenant-Workspaces
+	// (dasselbe Volume mountet der opencode-Container). Env
+	// OPENCODE_WORKSPACE_ROOT schlägt dieses Feld; Default /workspaces.
+	OpenCodeWorkspaceRoot string
+	// OpenCodeModel ist das Default-Modell für neue Lernchat-Sessions
+	// (OpenRouter-ID im Format provider/modell, z. B.
+	// openrouter/deepseek/deepseek-v4.1-flash). Env OPENCODE_MODEL schlägt dieses
+	// Feld; Default siehe openCodeDefaultModel in opencode.go. Das Backend
+	// gibt es bei jeder Nachricht an POST /session/{id}/message mit.
+	OpenCodeModel string
 }
 
 func (h *Server) PostApiV1AuthLogin(w http.ResponseWriter, r *http.Request) {

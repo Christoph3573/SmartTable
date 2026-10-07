@@ -1,0 +1,81 @@
+---
+# SchoolConnect v0.1.0 als systemd-Service auf dem Host:
+# Binary aus dem GitHub-Release laden -> /opt/schoolconnect/schoolconnect
+# -> `schoolconnect serve` auf 127.0.0.1:<port>.
+- name: Service-User anlegen
+  ansible.builtin.user:
+    name: "{{ schoolconnect_user }}"
+    system: true
+    create_home: true
+    shell: /usr/sbin/nologin
+
+- name: Installationsverzeichnis anlegen
+  ansible.builtin.file:
+    path: "{{ schoolconnect_dir }}"
+    state: directory
+    owner: "{{ schoolconnect_user }}"
+    group: "{{ schoolconnect_user }}"
+    mode: "0750"
+
+- name: SchoolConnect-Binary aus dem GitHub-Release laden
+  ansible.builtin.get_url:
+    url: "{{ schoolconnect_download_url }}"
+    dest: "{{ schoolconnect_dir }}/{{ schoolconnect_asset }}"
+    owner: "{{ schoolconnect_user }}"
+    group: "{{ schoolconnect_user }}"
+    mode: "0755"
+    checksum: "{{ 'sha256:' + schoolconnect_sha256 if schoolconnect_sha256 | default('') | length > 0 else omit }}"
+    timeout: 120
+  register: schoolconnect_download
+  notify: restart schoolconnect
+
+- name: Gewünschtes Binary aktivieren (Symlink auf das Release-Asset)
+  ansible.builtin.file:
+    src: "{{ schoolconnect_dir }}/{{ schoolconnect_asset }}"
+    dest: "{{ schoolconnect_binary }}"
+    owner: "{{ schoolconnect_user }}"
+    group: "{{ schoolconnect_user }}"
+    state: link
+  notify: restart schoolconnect
+
+- name: Binary-Version prüfen (Smoke-Test)
+  ansible.builtin.command:
+    cmd: "{{ schoolconnect_binary }} list"
+  become: true
+  become_user: "{{ schoolconnect_user }}"
+  register: schoolconnect_list
+  changed_when: false
+  failed_when: schoolconnect_list.rc != 0
+
+- name: systemd-Unit templaten
+  ansible.builtin.template:
+    src: schoolconnect.service.j2
+    dest: /etc/systemd/system/schoolconnect.service
+    mode: "0644"
+  notify:
+    - daemon-reload
+    - restart schoolconnect
+
+- name: Service aktivieren und starten
+  ansible.builtin.systemd:
+    name: schoolconnect
+    enabled: true
+    state: started
+
+- name: Handler jetzt ausführen (damit der Smoke-Test die frische Unit trifft)
+  ansible.builtin.meta: flush_handlers
+
+- name: Kurz warten bis der REST-Port hochkommt
+  ansible.builtin.wait_for:
+    host: "{{ schoolconnect_bind }}"
+    port: "{{ schoolconnect_port }}"
+    timeout: 30
+
+- name: REST-Index abfragen (Smoke-Test /api)
+  ansible.builtin.uri:
+    url: "http://{{ schoolconnect_bind }}:{{ schoolconnect_port }}/api"
+    status_code: 200
+  register: schoolconnect_api
+  until: schoolconnect_api.status == 200
+  retries: 5
+  delay: 2

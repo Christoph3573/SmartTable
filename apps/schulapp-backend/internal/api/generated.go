@@ -249,6 +249,24 @@ func (e JoinRequestStatus) Valid() bool {
 	}
 }
 
+// Defines values for OpenCodeMessageRole.
+const (
+	OpenCodeMessageRoleAssistant OpenCodeMessageRole = "assistant"
+	OpenCodeMessageRoleUser      OpenCodeMessageRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the OpenCodeMessageRole enum.
+func (e OpenCodeMessageRole) Valid() bool {
+	switch e {
+	case OpenCodeMessageRoleAssistant:
+		return true
+	case OpenCodeMessageRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SubstitutionType.
 const (
 	SubstitutionTypeCancellation SubstitutionType = "cancellation"
@@ -519,6 +537,11 @@ type CreateLessonRequest struct {
 	TeacherId int     `json:"teacher_id"`
 }
 
+// CreateOpenCodeSessionRequest defines model for CreateOpenCodeSessionRequest.
+type CreateOpenCodeSessionRequest struct {
+	Title *string `json:"title,omitempty"`
+}
+
 // CreateSchoolRequest defines model for CreateSchoolRequest.
 type CreateSchoolRequest struct {
 	Name string `json:"name"`
@@ -558,6 +581,22 @@ type CreateUserRequest struct {
 
 // CreateUserRequestRole defines model for CreateUserRequest.Role.
 type CreateUserRequestRole string
+
+// CreateVocabCardRequest defines model for CreateVocabCardRequest.
+type CreateVocabCardRequest struct {
+	Back  string  `json:"back"`
+	Front string  `json:"front"`
+	Hint  *string `json:"hint,omitempty"`
+}
+
+// CreateVocabSetRequest defines model for CreateVocabSetRequest.
+type CreateVocabSetRequest struct {
+	ClassId     *int    `json:"class_id,omitempty"`
+	Description *string `json:"description,omitempty"`
+	SourceLang  string  `json:"source_lang"`
+	TargetLang  string  `json:"target_lang"`
+	Title       string  `json:"title"`
+}
 
 // Error defines model for Error.
 type Error struct {
@@ -604,6 +643,11 @@ type FileFolder struct {
 // GradeSubmissionRequest defines model for GradeSubmissionRequest.
 type GradeSubmissionRequest struct {
 	Grade float32 `json:"grade"`
+}
+
+// GradeVocabCardRequest defines model for GradeVocabCardRequest.
+type GradeVocabCardRequest struct {
+	Known bool `json:"known"`
 }
 
 // Homework defines model for Homework.
@@ -693,6 +737,37 @@ type Message struct {
 	SenderId  int       `json:"sender_id"`
 }
 
+// OpenCodeMessage defines model for OpenCodeMessage.
+type OpenCodeMessage struct {
+	Content   string              `json:"content"`
+	CreatedAt time.Time           `json:"created_at"`
+	Id        int                 `json:"id"`
+	Role      OpenCodeMessageRole `json:"role"`
+	Tokens    *int                `json:"tokens,omitempty"`
+}
+
+// OpenCodeMessageRole defines model for OpenCodeMessage.Role.
+type OpenCodeMessageRole string
+
+// OpenCodeSession defines model for OpenCodeSession.
+type OpenCodeSession struct {
+	CreatedAt     time.Time `json:"created_at"`
+	Id            int       `json:"id"`
+	MessageCount  int       `json:"message_count"`
+	ModelId       *string   `json:"model_id,omitempty"`
+	ModelProvider *string   `json:"model_provider,omitempty"`
+	Title         string    `json:"title"`
+	Workspace     string    `json:"workspace"`
+}
+
+// OpenCodeStatus defines model for OpenCodeStatus.
+type OpenCodeStatus struct {
+	BaseUrl    *string `json:"base_url,omitempty"`
+	Configured bool    `json:"configured"`
+	Hint       *string `json:"hint,omitempty"`
+	Reachable  bool    `json:"reachable"`
+}
+
 // RefreshResponse defines model for RefreshResponse.
 type RefreshResponse struct {
 	AccessToken string `json:"access_token"`
@@ -719,6 +794,11 @@ type School struct {
 type SendMessageRequest struct {
 	Content string `json:"content"`
 	FileId  *int   `json:"file_id,omitempty"`
+}
+
+// SendOpenCodeMessageRequest defines model for SendOpenCodeMessageRequest.
+type SendOpenCodeMessageRequest struct {
+	Content string `json:"content"`
 }
 
 // Subject defines model for Subject.
@@ -821,6 +901,20 @@ type UpdateUserRequest struct {
 // UpdateUserRequestRole defines model for UpdateUserRequest.Role.
 type UpdateUserRequestRole string
 
+// UpdateVocabCardRequest defines model for UpdateVocabCardRequest.
+type UpdateVocabCardRequest struct {
+	Back  *string `json:"back,omitempty"`
+	Front *string `json:"front,omitempty"`
+	Hint  *string `json:"hint,omitempty"`
+}
+
+// UpdateVocabSetRequest defines model for UpdateVocabSetRequest.
+type UpdateVocabSetRequest struct {
+	ClassId     *int    `json:"class_id,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Title       *string `json:"title,omitempty"`
+}
+
 // User defines model for User.
 type User struct {
 	Email     openapi_types.Email `json:"email"`
@@ -833,6 +927,30 @@ type User struct {
 
 // UserRole defines model for User.Role.
 type UserRole string
+
+// VocabCard defines model for VocabCard.
+type VocabCard struct {
+	Back  string    `json:"back"`
+	Box   int       `json:"box"`
+	DueAt time.Time `json:"due_at"`
+	Front string    `json:"front"`
+	Hint  *string   `json:"hint,omitempty"`
+	Id    int       `json:"id"`
+	SetId int       `json:"set_id"`
+}
+
+// VocabSet defines model for VocabSet.
+type VocabSet struct {
+	CardCount   int        `json:"card_count"`
+	ClassId     *int       `json:"class_id,omitempty"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	Id          int        `json:"id"`
+	OwnerId     int        `json:"owner_id"`
+	SourceLang  string     `json:"source_lang"`
+	TargetLang  string     `json:"target_lang"`
+	Title       string     `json:"title"`
+}
 
 // GetApiV1ChannelsIdMessagesParams defines parameters for GetApiV1ChannelsIdMessages.
 type GetApiV1ChannelsIdMessagesParams struct {
@@ -933,6 +1051,12 @@ type PatchApiV1HomeworkIdJSONRequestBody = UpdateHomeworkRequest
 // PostApiV1HomeworkIdSubmissionsMultipartRequestBody defines body for PostApiV1HomeworkIdSubmissions for multipart/form-data ContentType.
 type PostApiV1HomeworkIdSubmissionsMultipartRequestBody PostApiV1HomeworkIdSubmissionsMultipartBody
 
+// PostApiV1IntegrationsOpencodeSessionsJSONRequestBody defines body for PostApiV1IntegrationsOpencodeSessions for application/json ContentType.
+type PostApiV1IntegrationsOpencodeSessionsJSONRequestBody = CreateOpenCodeSessionRequest
+
+// PostApiV1IntegrationsOpencodeSessionsIdMessagesJSONRequestBody defines body for PostApiV1IntegrationsOpencodeSessionsIdMessages for application/json ContentType.
+type PostApiV1IntegrationsOpencodeSessionsIdMessagesJSONRequestBody = SendOpenCodeMessageRequest
+
 // PatchApiV1LessonsIdJSONRequestBody defines body for PatchApiV1LessonsId for application/json ContentType.
 type PatchApiV1LessonsIdJSONRequestBody = UpdateLessonRequest
 
@@ -959,6 +1083,21 @@ type PostApiV1UsersBulkJSONRequestBody = BulkCreateUsersRequest
 
 // PatchApiV1UsersIdJSONRequestBody defines body for PatchApiV1UsersId for application/json ContentType.
 type PatchApiV1UsersIdJSONRequestBody = UpdateUserRequest
+
+// PatchApiV1VocabCardsIdJSONRequestBody defines body for PatchApiV1VocabCardsId for application/json ContentType.
+type PatchApiV1VocabCardsIdJSONRequestBody = UpdateVocabCardRequest
+
+// PostApiV1VocabCardsIdGradeJSONRequestBody defines body for PostApiV1VocabCardsIdGrade for application/json ContentType.
+type PostApiV1VocabCardsIdGradeJSONRequestBody = GradeVocabCardRequest
+
+// PostApiV1VocabSetsJSONRequestBody defines body for PostApiV1VocabSets for application/json ContentType.
+type PostApiV1VocabSetsJSONRequestBody = CreateVocabSetRequest
+
+// PatchApiV1VocabSetsIdJSONRequestBody defines body for PatchApiV1VocabSetsId for application/json ContentType.
+type PatchApiV1VocabSetsIdJSONRequestBody = UpdateVocabSetRequest
+
+// PostApiV1VocabSetsIdCardsJSONRequestBody defines body for PostApiV1VocabSetsIdCards for application/json ContentType.
+type PostApiV1VocabSetsIdCardsJSONRequestBody = CreateVocabCardRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -1094,6 +1233,39 @@ type ServerInterface interface {
 	// PostApiV1HomeworkIdSubmissions Hausaufgabe abgeben
 	// (POST /api/v1/homework/{id}/submissions)
 	PostApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1IntegrationsOpencodeSessions Eigene OpenCode-Chat-Sessions auflisten
+	// (GET /api/v1/integrations/opencode/sessions)
+	GetApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r *http.Request)
+	// PostApiV1IntegrationsOpencodeSessions Neue OpenCode-Chat-Session anlegen (eigener Tenant-Workspace)
+	// (POST /api/v1/integrations/opencode/sessions)
+	PostApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r *http.Request)
+	// DeleteApiV1IntegrationsOpencodeSessionsId Session löschen (nur Owner, inkl. Verlauf)
+	// (DELETE /api/v1/integrations/opencode/sessions/{id})
+	DeleteApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1IntegrationsOpencodeSessionsId Session mit Nachrichtenverlauf abrufen (nur Owner)
+	// (GET /api/v1/integrations/opencode/sessions/{id})
+	GetApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter, r *http.Request, id int)
+	// PostApiV1IntegrationsOpencodeSessionsIdMessages Nachricht an OpenCode senden (Antwort kommt vollständig + per WebSocket-Event)
+	// (POST /api/v1/integrations/opencode/sessions/{id}/messages)
+	PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1IntegrationsOpencodeStatus OpenCode-Status (Erreichbarkeit des Sidecar-Services)
+	// (GET /api/v1/integrations/opencode/status)
+	GetApiV1IntegrationsOpencodeStatus(w http.ResponseWriter, r *http.Request)
+	// GetApiV1IntegrationsSchoolconnectStatus SchoolConnect-Status (Erreichbarkeit + verfügbare Plugins)
+	// (GET /api/v1/integrations/schoolconnect/status)
+	GetApiV1IntegrationsSchoolconnectStatus(w http.ResponseWriter, r *http.Request)
+	// PostApiV1IntegrationsSchoolconnectPluginAuth Bei einem SchoolConnect-Plugin anmelden (Credentials im Body)
+	// (POST /api/v1/integrations/schoolconnect/{plugin}/auth)
+	PostApiV1IntegrationsSchoolconnectPluginAuth(w http.ResponseWriter, r *http.Request, plugin string)
+	// PostApiV1IntegrationsSchoolconnectPluginLogout SchoolConnect-Session eines Plugins verwerfen
+	// (POST /api/v1/integrations/schoolconnect/{plugin}/logout)
+	PostApiV1IntegrationsSchoolconnectPluginLogout(w http.ResponseWriter, r *http.Request, plugin string)
+	// GetApiV1IntegrationsSchoolconnectPluginFunction Lesende SchoolConnect-Funktion aufrufen (Query-Params werden gereicht)
+	// (GET /api/v1/integrations/schoolconnect/{plugin}/{function})
+	GetApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request, plugin string, function string)
+	// PostApiV1IntegrationsSchoolconnectPluginFunction Lesende SchoolConnect-Funktion aufrufen (JSON-Body wird gereicht)
+	// (POST /api/v1/integrations/schoolconnect/{plugin}/{function})
+	PostApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request, plugin string, function string)
 	// PostApiV1JoinRequestsIdApprove Beitrittsanfrage freigeben
 	// (POST /api/v1/join-requests/{id}/approve)
 	PostApiV1JoinRequestsIdApprove(w http.ResponseWriter, r *http.Request, id int)
@@ -1163,6 +1335,33 @@ type ServerInterface interface {
 	// PatchApiV1UsersId Benutzer aktualisieren
 	// (PATCH /api/v1/users/{id})
 	PatchApiV1UsersId(w http.ResponseWriter, r *http.Request, id int)
+	// DeleteApiV1VocabCardsId Karte löschen (nur Owner des Sets)
+	// (DELETE /api/v1/vocab/cards/{id})
+	DeleteApiV1VocabCardsId(w http.ResponseWriter, r *http.Request, id int)
+	// PatchApiV1VocabCardsId Karte bearbeiten (nur Owner des Sets)
+	// (PATCH /api/v1/vocab/cards/{id})
+	PatchApiV1VocabCardsId(w http.ResponseWriter, r *http.Request, id int)
+	// PostApiV1VocabCardsIdGrade Karte bewerten (Leitner: gewusst → Box+1, sonst Box 1)
+	// (POST /api/v1/vocab/cards/{id}/grade)
+	PostApiV1VocabCardsIdGrade(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1VocabSets Eigene Vokabelsets + Klassensets auflisten
+	// (GET /api/v1/vocab/sets)
+	GetApiV1VocabSets(w http.ResponseWriter, r *http.Request)
+	// PostApiV1VocabSets Vokabelset anlegen (optional einer Klasse teilen)
+	// (POST /api/v1/vocab/sets)
+	PostApiV1VocabSets(w http.ResponseWriter, r *http.Request)
+	// DeleteApiV1VocabSetsId Vokabelset löschen (nur Owner, inkl. Karten)
+	// (DELETE /api/v1/vocab/sets/{id})
+	DeleteApiV1VocabSetsId(w http.ResponseWriter, r *http.Request, id int)
+	// PatchApiV1VocabSetsId Vokabelset aktualisieren (nur Owner)
+	// (PATCH /api/v1/vocab/sets/{id})
+	PatchApiV1VocabSetsId(w http.ResponseWriter, r *http.Request, id int)
+	// GetApiV1VocabSetsIdCards Karten eines Vokabelsets auflisten
+	// (GET /api/v1/vocab/sets/{id}/cards)
+	GetApiV1VocabSetsIdCards(w http.ResponseWriter, r *http.Request, id int)
+	// PostApiV1VocabSetsIdCards Karte zu einem Vokabelset hinzufügen (nur Owner)
+	// (POST /api/v1/vocab/sets/{id}/cards)
+	PostApiV1VocabSetsIdCards(w http.ResponseWriter, r *http.Request, id int)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -1433,6 +1632,72 @@ func (_ Unimplemented) PostApiV1HomeworkIdSubmissions(w http.ResponseWriter, r *
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetApiV1IntegrationsOpencodeSessions Eigene OpenCode-Chat-Sessions auflisten
+// (GET /api/v1/integrations/opencode/sessions)
+func (_ Unimplemented) GetApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1IntegrationsOpencodeSessions Neue OpenCode-Chat-Session anlegen (eigener Tenant-Workspace)
+// (POST /api/v1/integrations/opencode/sessions)
+func (_ Unimplemented) PostApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteApiV1IntegrationsOpencodeSessionsId Session löschen (nur Owner, inkl. Verlauf)
+// (DELETE /api/v1/integrations/opencode/sessions/{id})
+func (_ Unimplemented) DeleteApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1IntegrationsOpencodeSessionsId Session mit Nachrichtenverlauf abrufen (nur Owner)
+// (GET /api/v1/integrations/opencode/sessions/{id})
+func (_ Unimplemented) GetApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1IntegrationsOpencodeSessionsIdMessages Nachricht an OpenCode senden (Antwort kommt vollständig + per WebSocket-Event)
+// (POST /api/v1/integrations/opencode/sessions/{id}/messages)
+func (_ Unimplemented) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1IntegrationsOpencodeStatus OpenCode-Status (Erreichbarkeit des Sidecar-Services)
+// (GET /api/v1/integrations/opencode/status)
+func (_ Unimplemented) GetApiV1IntegrationsOpencodeStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1IntegrationsSchoolconnectStatus SchoolConnect-Status (Erreichbarkeit + verfügbare Plugins)
+// (GET /api/v1/integrations/schoolconnect/status)
+func (_ Unimplemented) GetApiV1IntegrationsSchoolconnectStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1IntegrationsSchoolconnectPluginAuth Bei einem SchoolConnect-Plugin anmelden (Credentials im Body)
+// (POST /api/v1/integrations/schoolconnect/{plugin}/auth)
+func (_ Unimplemented) PostApiV1IntegrationsSchoolconnectPluginAuth(w http.ResponseWriter, r *http.Request, plugin string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1IntegrationsSchoolconnectPluginLogout SchoolConnect-Session eines Plugins verwerfen
+// (POST /api/v1/integrations/schoolconnect/{plugin}/logout)
+func (_ Unimplemented) PostApiV1IntegrationsSchoolconnectPluginLogout(w http.ResponseWriter, r *http.Request, plugin string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1IntegrationsSchoolconnectPluginFunction Lesende SchoolConnect-Funktion aufrufen (Query-Params werden gereicht)
+// (GET /api/v1/integrations/schoolconnect/{plugin}/{function})
+func (_ Unimplemented) GetApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request, plugin string, function string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1IntegrationsSchoolconnectPluginFunction Lesende SchoolConnect-Funktion aufrufen (JSON-Body wird gereicht)
+// (POST /api/v1/integrations/schoolconnect/{plugin}/{function})
+func (_ Unimplemented) PostApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request, plugin string, function string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // PostApiV1JoinRequestsIdApprove Beitrittsanfrage freigeben
 // (POST /api/v1/join-requests/{id}/approve)
 func (_ Unimplemented) PostApiV1JoinRequestsIdApprove(w http.ResponseWriter, r *http.Request, id int) {
@@ -1568,6 +1833,60 @@ func (_ Unimplemented) GetApiV1UsersId(w http.ResponseWriter, r *http.Request, i
 // PatchApiV1UsersId Benutzer aktualisieren
 // (PATCH /api/v1/users/{id})
 func (_ Unimplemented) PatchApiV1UsersId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteApiV1VocabCardsId Karte löschen (nur Owner des Sets)
+// (DELETE /api/v1/vocab/cards/{id})
+func (_ Unimplemented) DeleteApiV1VocabCardsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PatchApiV1VocabCardsId Karte bearbeiten (nur Owner des Sets)
+// (PATCH /api/v1/vocab/cards/{id})
+func (_ Unimplemented) PatchApiV1VocabCardsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1VocabCardsIdGrade Karte bewerten (Leitner: gewusst → Box+1, sonst Box 1)
+// (POST /api/v1/vocab/cards/{id}/grade)
+func (_ Unimplemented) PostApiV1VocabCardsIdGrade(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1VocabSets Eigene Vokabelsets + Klassensets auflisten
+// (GET /api/v1/vocab/sets)
+func (_ Unimplemented) GetApiV1VocabSets(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1VocabSets Vokabelset anlegen (optional einer Klasse teilen)
+// (POST /api/v1/vocab/sets)
+func (_ Unimplemented) PostApiV1VocabSets(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteApiV1VocabSetsId Vokabelset löschen (nur Owner, inkl. Karten)
+// (DELETE /api/v1/vocab/sets/{id})
+func (_ Unimplemented) DeleteApiV1VocabSetsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PatchApiV1VocabSetsId Vokabelset aktualisieren (nur Owner)
+// (PATCH /api/v1/vocab/sets/{id})
+func (_ Unimplemented) PatchApiV1VocabSetsId(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetApiV1VocabSetsIdCards Karten eines Vokabelsets auflisten
+// (GET /api/v1/vocab/sets/{id}/cards)
+func (_ Unimplemented) GetApiV1VocabSetsIdCards(w http.ResponseWriter, r *http.Request, id int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostApiV1VocabSetsIdCards Karte zu einem Vokabelset hinzufügen (nur Owner)
+// (POST /api/v1/vocab/sets/{id}/cards)
+func (_ Unimplemented) PostApiV1VocabSetsIdCards(w http.ResponseWriter, r *http.Request, id int) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2680,6 +2999,262 @@ func (siw *ServerInterfaceWrapper) PostApiV1HomeworkIdSubmissions(w http.Respons
 	handler.ServeHTTP(w, r)
 }
 
+// GetApiV1IntegrationsOpencodeSessions operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1IntegrationsOpencodeSessions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1IntegrationsOpencodeSessions operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1IntegrationsOpencodeSessions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1IntegrationsOpencodeSessions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteApiV1IntegrationsOpencodeSessionsId operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiV1IntegrationsOpencodeSessionsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1IntegrationsOpencodeSessionsId operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1IntegrationsOpencodeSessionsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1IntegrationsOpencodeSessionsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1IntegrationsOpencodeSessionsIdMessages operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1IntegrationsOpencodeSessionsIdMessages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1IntegrationsOpencodeSessionsIdMessages(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1IntegrationsOpencodeStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1IntegrationsOpencodeStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1IntegrationsOpencodeStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1IntegrationsSchoolconnectStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1IntegrationsSchoolconnectStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1IntegrationsSchoolconnectStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1IntegrationsSchoolconnectPluginAuth operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1IntegrationsSchoolconnectPluginAuth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "plugin" -------------
+	var plugin string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "plugin", chi.URLParam(r, "plugin"), &plugin, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "plugin", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1IntegrationsSchoolconnectPluginAuth(w, r, plugin)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1IntegrationsSchoolconnectPluginLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1IntegrationsSchoolconnectPluginLogout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "plugin" -------------
+	var plugin string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "plugin", chi.URLParam(r, "plugin"), &plugin, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "plugin", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1IntegrationsSchoolconnectPluginLogout(w, r, plugin)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1IntegrationsSchoolconnectPluginFunction operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "plugin" -------------
+	var plugin string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "plugin", chi.URLParam(r, "plugin"), &plugin, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "plugin", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "function" -------------
+	var function string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "function", chi.URLParam(r, "function"), &function, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "function", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1IntegrationsSchoolconnectPluginFunction(w, r, plugin, function)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1IntegrationsSchoolconnectPluginFunction operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1IntegrationsSchoolconnectPluginFunction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "plugin" -------------
+	var plugin string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "plugin", chi.URLParam(r, "plugin"), &plugin, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "plugin", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "function" -------------
+	var function string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "function", chi.URLParam(r, "function"), &function, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "function", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1IntegrationsSchoolconnectPluginFunction(w, r, plugin, function)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostApiV1JoinRequestsIdApprove operation middleware
 func (siw *ServerInterfaceWrapper) PostApiV1JoinRequestsIdApprove(w http.ResponseWriter, r *http.Request) {
 
@@ -3198,6 +3773,216 @@ func (siw *ServerInterfaceWrapper) PatchApiV1UsersId(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteApiV1VocabCardsId operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1VocabCardsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiV1VocabCardsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchApiV1VocabCardsId operation middleware
+func (siw *ServerInterfaceWrapper) PatchApiV1VocabCardsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchApiV1VocabCardsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1VocabCardsIdGrade operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1VocabCardsIdGrade(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1VocabCardsIdGrade(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1VocabSets operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1VocabSets(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1VocabSets(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1VocabSets operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1VocabSets(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1VocabSets(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteApiV1VocabSetsId operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1VocabSetsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiV1VocabSetsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchApiV1VocabSetsId operation middleware
+func (siw *ServerInterfaceWrapper) PatchApiV1VocabSetsId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchApiV1VocabSetsId(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiV1VocabSetsIdCards operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1VocabSetsIdCards(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1VocabSetsIdCards(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiV1VocabSetsIdCards operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1VocabSetsIdCards(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1VocabSetsIdCards(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -3510,6 +4295,66 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/subjects", wrapper.PostApiV1Subjects)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/vocab/sets", wrapper.GetApiV1VocabSets)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/vocab/sets", wrapper.PostApiV1VocabSets)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/vocab/sets/{id}", wrapper.DeleteApiV1VocabSetsId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/api/v1/vocab/sets/{id}", wrapper.PatchApiV1VocabSetsId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/vocab/sets/{id}/cards", wrapper.GetApiV1VocabSetsIdCards)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/vocab/sets/{id}/cards", wrapper.PostApiV1VocabSetsIdCards)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/vocab/cards/{id}", wrapper.DeleteApiV1VocabCardsId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/api/v1/vocab/cards/{id}", wrapper.PatchApiV1VocabCardsId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/vocab/cards/{id}/grade", wrapper.PostApiV1VocabCardsIdGrade)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/integrations/opencode/status", wrapper.GetApiV1IntegrationsOpencodeStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/integrations/opencode/sessions", wrapper.GetApiV1IntegrationsOpencodeSessions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/integrations/opencode/sessions", wrapper.PostApiV1IntegrationsOpencodeSessions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/integrations/opencode/sessions/{id}", wrapper.DeleteApiV1IntegrationsOpencodeSessionsId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/integrations/opencode/sessions/{id}", wrapper.GetApiV1IntegrationsOpencodeSessionsId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/integrations/opencode/sessions/{id}/messages", wrapper.PostApiV1IntegrationsOpencodeSessionsIdMessages)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/integrations/schoolconnect/status", wrapper.GetApiV1IntegrationsSchoolconnectStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/integrations/schoolconnect/{plugin}/auth", wrapper.PostApiV1IntegrationsSchoolconnectPluginAuth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/integrations/schoolconnect/{plugin}/logout", wrapper.PostApiV1IntegrationsSchoolconnectPluginLogout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/integrations/schoolconnect/{plugin}/{function}", wrapper.GetApiV1IntegrationsSchoolconnectPluginFunction)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/integrations/schoolconnect/{plugin}/{function}", wrapper.PostApiV1IntegrationsSchoolconnectPluginFunction)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/health", wrapper.GetApiV1Health)
 	})
 
@@ -3521,84 +4366,105 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

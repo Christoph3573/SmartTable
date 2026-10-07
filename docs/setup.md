@@ -27,7 +27,33 @@ DATABASE_URL=postgres://user:pass@localhost:5432/schulapp
 JWT_SECRET=your-secret-here
 PORT=8080
 UPLOAD_DIR=./uploads
+SCHOOLCONNECT_BASE_URL=http://schoolconnect:8081
+# Optional: HMAC-Signatur für X-SC-Tenant (muss zum Sidecar passen).
+SC_TENANT_SHARED_SECRET=
 ```
+
+## SchoolConnect (optionaler Data-Provider)
+
+Das Backend proxied lesende Aufrufe an die SchoolConnect-REST-API v0.3.0
+(`GET /api/v1/integrations/schoolconnect/...`, siehe `docs/api.md`).
+SchoolConnect läuft als Sidecar-Service `schoolconnect` im Compose-Netz
+(nur internes Netz, kein Host-Port) mit `SC_REQUIRE_TENANT=true`; der
+Proxy setzt `X-SC-Tenant` aus der JWT-`user_id` — Credentials +
+Login-Sessions sind pro App-Benutzer isoliert (Logout trifft nur die
+eigene Session). Ohne laufenden Sidecar meldet `GET .../status` schlicht
+`{"reachable": false}` und die App bleibt auf dem SmartTable-Provider.
+
+```bash
+# Lokal ohne Compose (manueller Sidecar aus dem v0.3.0-Release):
+# https://github.com/Christoph3573/SchoolConnect/releases/tag/v0.3.0
+SC_REQUIRE_TENANT=true REST_ADDR=:8081 schoolconnect serve
+# ... und SCHOOLCONNECT_BASE_URL=http://127.0.0.1:8081 setzen.
+```
+
+Der Deploy (`deploy/deploy.yml` → Rolle `schulapp_docker`) baut und
+startet den Sidecar automatisch aus `apps/schoolconnect/Dockerfile` —
+dort ist nichts manuell zu tun. Die alte systemd-Rolle ist archiviert
+unter `deploy/roles/schoolconnect.systemd.disabled/`.
 
 ## Frontend
 
