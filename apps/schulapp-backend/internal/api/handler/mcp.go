@@ -282,11 +282,77 @@ func mcpToolsList() map[string]any {
 					},
 				},
 			},
+			{
+				"name":        "get_profile",
+				"description": "Eigenes Schülerprofil aus dem Schülerportal (Name, Klasse, Schule). Keine Parameter.",
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
+			},
+			{
+				"name":        "get_mebis",
+				"description": "mebis-Lernplattform (ByCS): action=courses|abschnitte|inhalt, dazu id (Kurs-/Abschnitts-ID).",
+				"inputSchema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"action": map[string]any{"type": "string", "description": "courses|abschnitte|inhalt"},
+						"id":     map[string]any{"type": "string", "description": "Kurs-/Abschnitts-ID (für abschnitte/inhalt)"},
+					},
+				},
+			},
+			{
+				"name":        "get_drive",
+				"description": "ByCS-Drive (Dateicloud): action=spaces|list, dazu space/path.",
+				"inputSchema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"action": map[string]any{"type": "string", "description": "spaces|list"},
+						"space":  map[string]any{"type": "string"},
+						"path":   map[string]any{"type": "string"},
+					},
+				},
+			},
+			{
+				"name":        "create_vocab_set",
+				"description": "Legt ein eigenes Vokabelset an (nur auf explizite User-Bitte). Max. 5 Sets/Tag. Gibt set_id + title zurück.",
+				"inputSchema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"title":       map[string]any{"type": "string"},
+						"source_lang": map[string]any{"type": "string"},
+						"target_lang": map[string]any{"type": "string"},
+						"description": map[string]any{"type": "string"},
+					},
+					"required": []string{"title", "source_lang", "target_lang"},
+				},
+			},
+			{
+				"name":        "add_vocab_cards",
+				"description": "Fügt Karten zu einem EIGENEN Set hinzu (Ownership geprüft, kein Klassenset-Schreiben). Max. 100 Karten/Call, Dubletten (gleiche Front) werden übersprungen.",
+				"inputSchema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"set_id": map[string]any{"type": "integer"},
+						"cards": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"front": map[string]any{"type": "string"},
+									"back":  map[string]any{"type": "string"},
+									"hint":  map[string]any{"type": "string"},
+								},
+								"required": []string{"front", "back"},
+							},
+						},
+					},
+					"required": []string{"set_id", "cards"},
+				},
+			},
 		},
 	}
 }
 
-// mcpCallTool führt ein Tool mit Tenant-Sichtbarkeit aus (nur lesend).
+// mcpCallTool führt ein Tool mit Tenant-Sichtbarkeit aus (lesend + die zwei
+// Vokabel-Write-Tools mit Ownership-Check und Caps).
 func (h *Server) mcpCallTool(r *http.Request, userID int, role, name string, args map[string]any) (string, bool) {
 	switch name {
 	case "get_schedule":
@@ -299,6 +365,16 @@ func (h *Server) mcpCallTool(r *http.Request, userID int, role, name string, arg
 		return h.mcpLearningPlan(r, args)
 	case "get_vocabularies":
 		return h.mcpVocab(r, userID, role, args)
+	case "get_profile":
+		return h.mcpProfile(r, userID)
+	case "get_mebis":
+		return h.mcpMebis(r, userID, args)
+	case "get_drive":
+		return h.mcpDrive(r, userID, args)
+	case "create_vocab_set":
+		return h.mcpCreateVocabSet(r, userID, args)
+	case "add_vocab_cards":
+		return h.mcpAddVocabCards(r, userID, args)
 	default:
 		return "Unbekanntes Tool: " + name, true
 	}
@@ -873,6 +949,232 @@ func (h *Server) mcpVocab(r *http.Request, userID int, role string, args map[str
 
 func itoa(n int) string {
 	return strconv.Itoa(n)
+}
+
+// mcpProfile liefert das Schülerportal-Profil (Tenant aus X-Session-Token).
+func (h *Server) mcpProfile(r *http.Request, userID int) (string, bool) {
+	data, ok := h.mcpSchoolConnectData(r, userID, "profil")
+	if !ok {
+		return "Schülerprofil konnte nicht geladen werden (SchoolConnect nicht erreichbar oder nicht angemeldet).", true
+	}
+	text := string(data)
+	if len(text) > 4000 {
+		text = text[:4000] + "… (gekürzt)"
+	}
+	if strings.TrimSpace(text) == "" || text == "null" {
+		return "Das Schülerportal meldet kein Profil.", false
+	}
+	return "Schülerprofil (Schülerportal via SchoolConnect):\n" + text, false
+}
+
+// mcpMebis proxied mebis-Aktionen (courses|abschnitte|inhalt) mit Tenant.
+func (h *Server) mcpMebis(r *http.Request, userID int, args map[string]any) (string, bool) {
+	action := strings.ToLower(mcpStrArg(args, "action"))
+	if action == "" {
+		action = "courses"
+	}
+	id := mcpStrArg(args, "id")
+	var function string
+	target := h.schoolConnectBase()
+	switch action {
+	case "courses":
+		function = "courses"
+	case "abschnitte":
+		function = "abschnitte"
+	case "inhalt":
+		function = "inhalt"
+	default:
+		return "Unbekannte mebis-Aktion (courses|abschnitte|inhalt erwartet).", true
+	}
+	target += "/api/mebis/" + function
+	params := url.Values{}
+	if id != "" {
+		params.Set("id", id)
+		if action == "abschnitte" {
+			params.Set("course", id)
+		}
+	}
+	if len(params) > 0 {
+		target += "?" + params.Encode()
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
+	if err != nil || status != http.StatusOK {
+		return "mebis ist gerade nicht erreichbar.", true
+	}
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil || len(env.Data) == 0 {
+		return "mebis-Antwort unverständlich.", true
+	}
+	text := string(env.Data)
+	if len(text) > 4000 {
+		text = text[:4000] + "… (gekürzt)"
+	}
+	return "mebis (" + function + " via SchoolConnect):\n" + text, false
+}
+
+// mcpDrive proxied bycs-drive-Aktionen (spaces|list) mit Tenant.
+func (h *Server) mcpDrive(r *http.Request, userID int, args map[string]any) (string, bool) {
+	action := strings.ToLower(mcpStrArg(args, "action"))
+	if action == "" {
+		action = "spaces"
+	}
+	var function string
+	switch action {
+	case "spaces":
+		function = "spaces"
+	case "list":
+		function = "list"
+	default:
+		return "Unbekannte Drive-Aktion (spaces|list erwartet).", true
+	}
+	target := h.schoolConnectBase() + "/api/bycs-drive/" + function
+	params := url.Values{}
+	if v := mcpStrArg(args, "space"); v != "" {
+		params.Set("space", v)
+	}
+	if v := mcpStrArg(args, "path"); v != "" {
+		params.Set("path", v)
+	}
+	if len(params) > 0 {
+		target += "?" + params.Encode()
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
+	if err != nil || status != http.StatusOK {
+		return "ByCS-Drive ist gerade nicht erreichbar.", true
+	}
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil || len(env.Data) == 0 {
+		return "Drive-Antwort unverständlich.", true
+	}
+	text := string(env.Data)
+	if len(text) > 4000 {
+		text = text[:4000] + "… (gekürzt)"
+	}
+	return "ByCS-Drive (" + function + " via SchoolConnect):\n" + text, false
+}
+
+const (
+	mcpMaxVocabSetsPerDay = 5
+	mcpMaxVocabCardsCall  = 100
+	mcpMaxVocabCardsSet   = 500
+)
+
+// mcpCreateVocabSet legt ein eigenes Set an (owner_id = Tenant, nie aus
+// Agent-Input; kein class_id). Cap: 5 Sets/Tag/User.
+func (h *Server) mcpCreateVocabSet(r *http.Request, userID int, args map[string]any) (string, bool) {
+	title := mcpStrArg(args, "title")
+	src := mcpStrArg(args, "source_lang")
+	dst := mcpStrArg(args, "target_lang")
+	desc := mcpStrArg(args, "description")
+	if title == "" || src == "" || dst == "" {
+		return "title, source_lang und target_lang sind Pflicht.", true
+	}
+	var today int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM vocab_sets WHERE owner_id=$1 AND created_at > NOW() - INTERVAL '1 day'`, userID).Scan(&today); err != nil {
+		return "Vokabelset konnte nicht angelegt werden.", true
+	}
+	if today >= mcpMaxVocabSetsPerDay {
+		return "Limit erreicht (max. 5 Sets/Tag via Agent).", true
+	}
+	var id int
+	err := h.DB.QueryRowContext(r.Context(),
+		`INSERT INTO vocab_sets (owner_id, title, description, source_lang, target_lang)
+		 VALUES ($1,$2,NULLIF($3,''),$4,$5) RETURNING id`,
+		userID, title, desc, src, dst).Scan(&id)
+	if err != nil {
+		return "Vokabelset konnte nicht angelegt werden.", true
+	}
+	return "Vokabelset angelegt: \"" + title + "\" (set_id=" + itoa(id) + ", " + src + "→" + dst + ").", false
+}
+
+// mcpAddVocabCards fügt Karten zu einem EIGENEN Set hinzu: Ownership
+// (owner_id == Tenant, kein Klassenset-Schreiben durch Agent), max 100/Call,
+// max 500/Set, leere Front/Back ablehnen, Dubletten (Front, case-insensitiv)
+// überspringen + zählen.
+func (h *Server) mcpAddVocabCards(r *http.Request, userID int, args map[string]any) (string, bool) {
+	setID, ok := mcpIntArg(args, "set_id")
+	if !ok || setID < 1 {
+		return "set_id ist Pflicht (Integer).", true
+	}
+	var ownerID int
+	var title string
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT owner_id, title FROM vocab_sets WHERE id=$1`, setID).Scan(&ownerID, &title); err != nil {
+		return "Vokabelset nicht gefunden.", true
+	}
+	if ownerID != userID {
+		return "Kein Zugriff: nur eigene Sets dürfen via Agent befüllt werden.", true
+	}
+	rawCards, _ := args["cards"].([]any)
+	if len(rawCards) == 0 {
+		return "cards ist leer (mind. 1 Karte mit front/back erwartet).", true
+	}
+	if len(rawCards) > mcpMaxVocabCardsCall {
+		return "Zu viele Karten (max. 100 pro Call — ggf. gechunkt senden).", true
+	}
+	var total int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM vocab_cards WHERE set_id=$1`, setID).Scan(&total); err != nil {
+		return "Karten konnten nicht geprüft werden.", true
+	}
+	if total >= mcpMaxVocabCardsSet {
+		return "Set ist voll (max. 500 Karten).", true
+	}
+	existing := map[string]bool{}
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT front FROM vocab_cards WHERE set_id=$1`, setID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var f string
+			if rows.Scan(&f) == nil {
+				existing[strings.ToLower(strings.TrimSpace(f))] = true
+			}
+		}
+	}
+	added, skipped := 0, 0
+	for _, rc := range rawCards {
+		m, _ := rc.(map[string]any)
+		if m == nil {
+			skipped++
+			continue
+		}
+		front, _ := m["front"].(string)
+		back, _ := m["back"].(string)
+		hint, _ := m["hint"].(string)
+		front, back, hint = strings.TrimSpace(front), strings.TrimSpace(back), strings.TrimSpace(hint)
+		if front == "" || back == "" {
+			skipped++
+			continue
+		}
+		if existing[strings.ToLower(front)] {
+			skipped++
+			continue
+		}
+		if total+added >= mcpMaxVocabCardsSet {
+			skipped++
+			continue
+		}
+		if _, err := h.DB.ExecContext(r.Context(),
+			`INSERT INTO vocab_cards (set_id, front, back, hint) VALUES ($1,$2,$3,NULLIF($4,''))`,
+			setID, front, back, hint); err != nil {
+			skipped++
+			continue
+		}
+		existing[strings.ToLower(front)] = true
+		added++
+	}
+	return "Vokabelset \"" + title + "\" (set_id=" + itoa(setID) + "): " +
+		itoa(added) + " Karten angelegt, " + itoa(skipped) +
+		" übersprungen (Dubletten/leer/Limit). Unter „Lernen → Vokabeln“ sichtbar.", false
 }
 
 type mcpSSESession struct {

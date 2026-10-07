@@ -45,12 +45,20 @@ Browser ──https──► Tunnel-VM (codeclub.check24.fun)
 |-----------|-------------|--------------|---------|
 | `postgres` | `postgres:16-alpine` | `127.0.0.1:<postgres_host_port> (25432) → 5432` | Datenbank, Volume `postgres_data`, Healthcheck `pg_isready` |
 | `migrate` | `migrate/migrate:v4.18.2` | keine | One-Shot: fährt SQL aus `apps/schulapp-backend/migrations` hoch (`service_completed_successfully`), danach exited |
-| `backend` | `apps/schulapp-backend/Dockerfile` | keine (nur intern `:8080`) | Go-API; braucht `DATABASE_URL`, `JWT_SECRET`, `SCHOOLCONNECT_BASE_URL=http://schoolconnect:8081`, `OPENCODE_BASE_URL=http://opencode:8082`; wartet auf `migrate` + `schoolconnect` + `opencode`; mountet `workspaces:/workspaces:ro` |
+| `backend` | `apps/schulapp-backend/Dockerfile` | keine (nur intern `:8080`) | Go-API; braucht `DATABASE_URL`, `JWT_SECRET`, `SCHOOLCONNECT_BASE_URL=http://schoolconnect:8081`, `OPENCODE_BASE_URL=http://opencode:8082`; wartet auf `migrate` + `schoolconnect` + `opencode`; mountet `workspaces:/workspaces` (rw — Uploads nach `uploads/s{id}/` und Outputs aus `outputs/s{id}/` brauchen Schreib-/Lesezugriff) |
 | `schoolconnect` | `apps/schoolconnect/Dockerfile` (Release-Binary v0.3.0) | keine (nur intern `:8081`) | Externe Schulplattformen (Schülerportal, mebis, ByCS, LehrplanPLUS); Volume `sc_creds` → `/data`; `SC_REQUIRE_TENANT=true` |
 | `opencode` | `apps/opencode/Dockerfile` (Release-Binary v1.18.32) | keine (nur intern `:8082`) | `opencode serve` (Agent-Runtime für den KI-Lernchat); braucht `OPENROUTER_API_KEY`; Volume `workspaces` → `/workspaces` (Tenant-Workspaces `/workspaces/<user_id>`) |
 | `frontend` | `apps/codeclub-ui/Dockerfile` (node-build → `nginx:alpine`) | `127.0.0.1:<tunnel_local_port> → 80` | Liefert `dist/` aus, proxied `/api/` ans Backend |
 
 Volumes: `postgres_data` (DB), `uploads_data` (Datei-Uploads), `sc_creds` (SchoolConnect-Sessions pro Tenant), `workspaces` (OpenCode-Workspaces pro User). Lokal: `docker compose up -d` (Frontend dann auf `http://localhost/`); Prod/Dev: identischer Stack, nur andere Ports/Secrets pro Host (`deploy/inventory/host_vars/<host>/vars.yml`). Der Pi braucht `openrouter_api_key` als Host-Var (sonst bleibt der KI-Chat im lokalen Modus).
+
+## Lern-KI: Upload → Sandbox, Outputs → Download, Parallelbetrieb
+
+- **Upload:** Im KI-Chat Dateien anhängen (max. 5 à 10 MB; `pdf, txt, md, png, jpg, jpeg, csv, docx, xlsx, pptx`) — sie landen in `/workspaces/<user_id>/uploads/s<session_id>/`, der Agent liest sie via `read`-Tool (Pfade stehen im Prompt). Guards: Größe/Anzahl/Typ, `filepath.Base`-Sanitizing, Traversal-Guard, keine Ausführung.
+- **Outputs:** Der Agent schreibt Ausgabedateien nach `/workspaces/<user_id>/outputs/s<session_id>/` und nennt sie im Antworttext; das Frontend zeigt Datei-Chips mit Download (`GET .../sessions/{id}/files[/{name}]`, Ownership-geprüft) plus WS-Event `opencode_files`. Kein Auto-Cleanup — Session-Löschen entfernt beide Unterordner best-effort.
+- **Sandbox-Rechte (workspace-isoliert):** `read/write/edit/bash/glob/grep` nur innerhalb des eigenen Workspaces, `webfetch/websearch` für Internet, `smarttable_*` + `question` für Schuldaten/Rückfragen erlaubt; `skill/task/todo/patch/lsp/plan/execute` weiter deny (per `PATCH /session/{id}` vor jedem Prompt gesetzt).
+- **Vokabeln aus Dateien:** Upload → „Erstelle Karteikarten daraus“ → Agent ruft `create_vocab_set` + `add_vocab_cards` (nur eigene Sets, max. 100/Call, 500/Set, 5 Sets/Tag, Dubletten-Skip) — sichtbar unter „Lernen → Vokabeln“. Ohne explizite Bitte nur Entwurf in `outputs/s{id}/`.
+- **Parallelbetrieb (Ist-Lage, keine Architekturänderung):** Ein gemeinsamer `opencode`-Prozess bedient alle User; jeder User hat `/workspaces/<user_id>` (aus JWT), jede Session `opencode_sessions.owner_id`-Ownership, MCP-Tenant aus `X-Session-Token`, SSE-Tail pro Generierung auf `sessionID` gefiltert, WS-Push via `Hub.SendToUser`. Keine Locks/Queues; gemeinsame Ressourcen: ein `OPENROUTER_API_KEY`, Connection-Pool 20/10, ein `workspaces`-Volume. Folgen: Latenz steigt unter Last, Provider-Rate-Limits gelten global, lange Generierungen blockieren keinen anderen User (nur der eigene Request wartet).
 
 ## Deployment-Infrastruktur
 

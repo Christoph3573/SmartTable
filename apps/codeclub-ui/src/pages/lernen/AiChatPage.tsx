@@ -10,6 +10,17 @@ import { formatDate } from "../../lib/format";
 
 type OpenCodeSession = components["schemas"]["OpenCodeSession"];
 type OpenCodeMessage = components["schemas"]["OpenCodeMessage"];
+type OpenCodeFile = components["schemas"]["OpenCodeFile"];
+type WsOpenCodeFilesEvent = { type: "opencode_files"; session_id: number; files: OpenCodeFile[] };
+
+const UPLOAD_ACCEPT = ".pdf,.txt,.md,.png,.jpg,.jpeg,.csv,.docx,.xlsx,.pptx";
+const MAX_UPLOAD_FILES = 5;
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 type WsOpenCodeEvent = { type: "opencode"; session_id: number; message: OpenCodeMessage };
 // Transiente Live-Steps vom Backend (WS-Vertrag, keine Persistenz):
 // {type:"opencode_step", session_id, step:{key,kind,label,status,detail?,tool?}}.
@@ -94,6 +105,11 @@ export function AiChatPage() {
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [backendState, setBackendState] = useState<"checking" | "online" | "offline">("checking");
+  const [selected, setSelected] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sessionFiles, setSessionFiles] = useState<OpenCodeFile[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -196,6 +212,11 @@ export function AiChatPage() {
         return [...prev.filter((m) => !m.pending), incoming];
       });
     };
+    const mergeStep = (steps: ChatStep[] | undefined, step: ChatStep): ChatStep[] => {
+      const current = steps ?? [];
+      const idx = current.findIndex((s) => s.key === step.key);
+      return idx === -1 ? [...current, step] : current.map((s, i) => (i === idx ? step : s));
+    };
     const onStep = (event: MessageEvent) => {
       let payload: WsOpenCodeStepEvent;
       try {
@@ -206,9 +227,24 @@ export function AiChatPage() {
       if (payload?.type !== "opencode_step" || payload.session_id !== activeId || !payload.step?.key) return;
       const step = payload.step;
       setMessages((prev) => {
-        const idx = prev.findIndex((m) => m.pending && m.role === "assistant");
-        if (idx === -1) {
-          // Kein lokaler Pending-Eintrag (z. B. anderer Tab hat gesendet):
+        const pendingIdx = prev.findIndex((m) => m.pending && m.role === "assistant");
+        if (pendingIdx !== -1) {
+          const next = prev.slice();
+          next[pendingIdx] = { ...next[pendingIdx], steps: mergeStep(next[pendingIdx].steps, step) };
+          return next;
+        }
+        // Race-Fix: Step trifft nach dem Final-Event ein (kein Pending mehr) —
+        // an die letzte fertige Assistant-Bubble anhängen statt verwerfen oder
+        // verwaisten Placeholder zu erzeugen.
+        let lastAssistant = -1;
+        for (let i = prev.length - 1; i >= 0; i--) {
+          if (prev[i].role === "assistant" && !prev[i].pending) {
+            lastAssistant = i;
+            break;
+          }
+        }
+        if (lastAssistant === -1) {
+          // Kein lokaler Eintrag (z. B. anderer Tab hat gesendet):
           // transienten Platzhalter anlegen, damit die Timeline sichtbar ist.
           return [
             ...prev,
@@ -223,22 +259,69 @@ export function AiChatPage() {
           ];
         }
         const next = prev.slice();
-        const current = next[idx].steps ?? [];
-        const stepIdx = current.findIndex((s) => s.key === step.key);
-        next[idx] = {
-          ...next[idx],
-          steps: stepIdx === -1 ? [...current, step] : current.map((s, i) => (i === stepIdx ? step : s)),
-        };
+        next[lastAssistant] = { ...next[lastAssistant], steps: mergeStep(next[lastAssistant].steps, step) };
         return next;
       });
     };
+    const onFiles = (event: MessageEvent) => {
+      let payload: WsOpenCodeFilesEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (payload?.type !== "opencode_files" || payload.session_id !== activeId || !Array.isArray(payload.files)) return;
+      setSessionFiles(payload.files);
+    };
     window.addEventListener("smarttable:opencode", onDone as EventListener);
     window.addEventListener("smarttable:opencode_step", onStep as EventListener);
+    window.addEventListener("smarttable:opencode_files", onFiles as EventListener);
     return () => {
       window.removeEventListener("smarttable:opencode", onDone as EventListener);
       window.removeEventListener("smarttable:opencode_step", onStep as EventListener);
+      window.removeEventListener("smarttable:opencode_files", onFiles as EventListener);
     };
   }, [activeId]);
+
+  // Outputs der aktiven Session laden (Liste, kein Polling — Updates kommen
+  // via WS-Event opencode_files nach jeder Generierung).
+  useEffect(() => {
+    if (activeId === null) {
+      setSessionFiles([]);
+      return;
+    }
+    let cancelled = false;
+    apiClient
+      .get<OpenCodeFile[]>(`/api/v1/integrations/opencode/sessions/${activeId}/files`)
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.data)) setSessionFiles(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionFiles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId]);
+
+  const downloadFile = async (file: OpenCodeFile) => {
+    try {
+      const res = await apiClient.get(
+        `/api/v1/integrations/opencode/sessions/${activeId}/files/${encodeURIComponent(file.name)}`,
+        { responseType: "blob" }
+      );
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name.replace(/^[0-9a-f]{16}-/, "");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      setUploadError("Download fehlgeschlagen.");
+    }
+  };
 
   // Fallback-Polling: Verlauf alle 5s nachladen, solange die Seite offen ist
   // (deckt Antworten ohne WS-Event ab).
@@ -346,8 +429,12 @@ export function AiChatPage() {
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
     const question = text.trim();
-    if (!question || sending) return;
+    if ((!question && !selected.length) || sending) return;
     setText("");
+    const toUpload = selected;
+    setSelected([]);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     let sessionId = activeId;
     if (sessionId === null) {
       if (backendState === "online") {
@@ -363,7 +450,7 @@ export function AiChatPage() {
         return;
       }
     }
-    push("user", question);
+    push("user", question + (toUpload.length ? `\n\n[${toUpload.length} Datei(en) angehängt: ${toUpload.map((f) => f.name).join(", ")}]` : ""));
     // Pending-Assistant-Eintrag mit leerer Step-Timeline anlegen — eintreffende
     // opencode_step-Events (session_id == activeId) pflegen sich dort ein.
     // Bleiben sie aus (WS-Reconnect, lokaler Modus), bleibt der
@@ -375,9 +462,28 @@ export function AiChatPage() {
     ]);
     setSending(true);
     try {
+      // Upload zuerst (multipart files[]), dann Nachricht mit file_names —
+      // atomar aus User-Sicht (ein Senden-Button für beides).
+      let fileNames: string[] = [];
+      if (toUpload.length) {
+        setUploading(true);
+        const form = new FormData();
+        toUpload.forEach((f) => form.append("files", f, f.name));
+        try {
+          const up = await apiClient.post<OpenCodeFile[]>(
+            `/api/v1/integrations/opencode/sessions/${sessionId}/uploads`,
+            form
+          );
+          fileNames = (up.data ?? []).map((f) => f.name);
+        } catch {
+          setUploadError("Upload fehlgeschlagen (max. 5 Dateien à 10 MB; pdf, txt, md, png, jpg, csv, docx, xlsx, pptx). Nachricht wird ohne Dateien gesendet.");
+        } finally {
+          setUploading(false);
+        }
+      }
       const res = await apiClient.post<OpenCodeMessage[]>(
         `/api/v1/integrations/opencode/sessions/${sessionId}/messages`,
-        { content: question }
+        fileNames.length ? { content: question || "Fasse die angehängten Dateien zusammen.", file_names: fileNames } : { content: question }
       );
       const reply = res.data.find((m) => m.role === "assistant");
       if (reply) {
@@ -400,6 +506,14 @@ export function AiChatPage() {
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== pendingId));
       }
+      // Outputs nach der Generierung aktualisieren (WS-Event kommt parallel,
+      // GET als Fallback falls WS verloren ging).
+      apiClient
+        .get<OpenCodeFile[]>(`/api/v1/integrations/opencode/sessions/${sessionId}/files`)
+        .then((r) => {
+          if (Array.isArray(r.data)) setSessionFiles(r.data);
+        })
+        .catch(() => {});
       refreshSessions();
     } catch {
       await refreshStatus();
@@ -483,7 +597,7 @@ export function AiChatPage() {
                 {activeSession ? activeSession.title : "Neuer Chat"}
               </h2>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                Sessions sind pro Benutzer isoliert.
+                Sessions sind pro Benutzer isoliert. Dateien via 📎 anhängen (Sandbox-Upload).
               </p>
             </div>
             {activeSession && (
@@ -552,7 +666,81 @@ export function AiChatPage() {
             <div ref={bottomRef} />
           </div>
 
+          {sessionFiles.length > 0 && (
+            <div className="border-t border-gray-200 bg-gray-50/70 px-5 py-2.5 dark:border-gray-700 dark:bg-gray-950/40">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Dateien der KI ({sessionFiles.length})
+              </p>
+              <ul className="flex flex-wrap gap-1.5">
+                {sessionFiles.map((f) => (
+                  <li key={f.name}>
+                    <button
+                      type="button"
+                      onClick={() => void downloadFile(f)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-sm hover:border-green-300 hover:text-green-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      title={`${f.mime} · ${formatBytes(f.size)} — herunterladen`}
+                    >
+                      <span aria-hidden="true">📎</span>
+                      <span className="max-w-44 truncate">{f.name.replace(/^[0-9a-f]{16}-/, "")}</span>
+                      <span className="text-gray-400">{formatBytes(f.size)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {selected.length > 0 && (
+            <div className="border-t border-gray-200 bg-white px-5 pt-2 dark:border-gray-700 dark:bg-gray-900">
+              <ul className="flex flex-wrap gap-1.5">
+                {selected.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs text-green-800 ring-1 ring-green-200 dark:bg-green-900/30 dark:text-green-200 dark:ring-green-800"
+                  >
+                    <span className="max-w-44 truncate">{f.name}</span>
+                    <span className="text-green-500">{formatBytes(f.size)}</span>
+                    <button
+                      type="button"
+                      aria-label={`Datei ${f.name} entfernen`}
+                      className="rounded-full px-1 hover:bg-green-100 dark:hover:bg-green-800"
+                      onClick={() => setSelected((prev) => prev.filter((_, j) => j !== i))}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {uploadError && (
+            <p className="border-t border-gray-200 bg-white px-5 pt-2 text-xs text-red-600 dark:border-gray-700 dark:bg-gray-900" role="alert">
+              {uploadError}
+            </p>
+          )}
           <form className="flex gap-2 border-t border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900" onSubmit={send}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={UPLOAD_ACCEPT}
+              multiple
+              className="hidden"
+              aria-label="Dateien anhängen"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []).slice(0, MAX_UPLOAD_FILES);
+                setUploadError(null);
+                setSelected(files);
+              }}
+            />
+            <button
+              type="button"
+              aria-label="Dateien anhängen (pdf, txt, md, png, jpg, csv, docx, xlsx, pptx)"
+              title="Dateien anhängen (max. 5 à 10 MB)"
+              className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || uploading}
+            >
+              📎
+            </button>
             <input
               aria-label="Nachricht an die Lern-KI"
               className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
@@ -560,7 +748,7 @@ export function AiChatPage() {
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
-            <Button loading={sending} disabled={!text.trim()}>
+            <Button loading={sending || uploading} disabled={!text.trim() && !selected.length}>
               Senden
             </Button>
           </form>

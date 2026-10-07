@@ -94,6 +94,131 @@ func TestOpenCodeToolLabel(t *testing.T) {
 	}
 }
 
+// TestParseOpenCodeMessageResponse_Shapes: POST-Antwort als Objekt ODER Array
+// (v1.17 vs. v1.18) — der Steps-Bug: Final-Message enthält oft nur text-Parts,
+// Tool-Parts stehen in früheren Messages und werden via Verlauf nachgeholt.
+func TestParseOpenCodeMessageResponse_Shapes(t *testing.T) {
+	obj := `{"info":{"tokens":{"input":1,"output":2,"total":3},"cost":0.1},"parts":[{"id":"p1","type":"text","text":"Hallo"}]}`
+	ans, types, err := parseOpenCodeMessageResponse([]byte(obj))
+	if err != nil {
+		t.Fatalf("Objekt-Parse: %v", err)
+	}
+	if len(ans.Parts) != 1 || types[0] != "text" {
+		t.Fatalf("Objekt falsch: %+v %v", ans, types)
+	}
+	// Array: letztes Element = Final (text-only), früheres enthält Tool-Part.
+	arr := `[{"info":{"tokens":{"input":1,"output":1,"total":2}},"parts":[{"id":"t1","type":"tool","callID":"c1","tool":"smarttable_get_schedule","state":{"status":"completed","output":"Mathe"}}]},{"info":{"tokens":{"input":1,"output":2,"total":3}},"parts":[{"id":"p2","type":"text","text":"Morgen: Mathe"}]}]`
+	ans, types, err = parseOpenCodeMessageResponse([]byte(arr))
+	if err != nil {
+		t.Fatalf("Array-Parse: %v", err)
+	}
+	if len(ans.Parts) != 1 || ans.Parts[0].Type != "text" {
+		t.Fatalf("Array-Final falsch: %+v", ans.Parts)
+	}
+	hist := parseOpenCodeMessageHistory([]byte(arr))
+	if len(hist) != 2 {
+		t.Fatalf("Verlauf: erwarte 2 Parts (Tool + Text), bekam %d", len(hist))
+	}
+	steps := mergeOpenCodeSteps(openCodeSteps(ans.Parts), openCodeSteps(hist))
+	if len(steps) != 1 || steps[0].Label != "Ruft Stundenplan ab" {
+		t.Fatalf("Merge-Steps falsch: %+v", steps)
+	}
+}
+
+func TestParseOpenCodeMessageResponse_Errors(t *testing.T) {
+	if _, _, err := parseOpenCodeMessageResponse([]byte(``)); err == nil {
+		t.Error("leer → Fehler erwartet")
+	}
+	if _, _, err := parseOpenCodeMessageResponse([]byte(`[]`)); err == nil {
+		t.Error("leeres Array → Fehler erwartet")
+	}
+	if _, _, err := parseOpenCodeMessageResponse([]byte(`{kaputt`)); err == nil {
+		t.Error("ungültiges JSON → Fehler erwartet")
+	}
+	if got := parseOpenCodeMessageHistory([]byte(`{kaputt`)); got != nil {
+		t.Errorf("Verlauf defekt → nil erwartet, bekam %+v", got)
+	}
+}
+
+func TestMergeOpenCodeSteps_Dedupe(t *testing.T) {
+	a := []openCodeStepView{{Key: "tool:c1", Kind: "tool", Label: "x", Status: "running"}}
+	b := []openCodeStepView{
+		{Key: "tool:c1", Kind: "tool", Label: "x", Status: "done"},
+		{Key: "reasoning:p1", Kind: "reasoning", Label: "Gedankengang", Status: "done"},
+	}
+	got := mergeOpenCodeSteps(a, b)
+	if len(got) != 2 {
+		t.Fatalf("Dedupe: erwarte 2, bekam %+v", got)
+	}
+	if got[0].Status != "running" {
+		t.Errorf("erste Gruppe gewinnt: %+v", got[0])
+	}
+}
+
+func TestOpenCodePermissionsFor_Scoped(t *testing.T) {
+	perms := openCodePermissionsFor("/workspaces/42")
+	allow := map[string]map[string]bool{}
+	for _, p := range perms {
+		if p["action"] == "allow" {
+			if allow[p["permission"]] == nil {
+				allow[p["permission"]] = map[string]bool{}
+			}
+			allow[p["permission"]][p["pattern"]] = true
+		}
+	}
+	for _, tool := range []string{"read", "write", "edit", "bash", "glob", "grep"} {
+		if !allow[tool]["/workspaces/42"] || !allow[tool]["/workspaces/42/**"] {
+			t.Errorf("%s nicht workspace-scoped: %v", tool, allow[tool])
+		}
+	}
+	if !allow["smarttable_*"]["*"] || !allow["question"]["*"] {
+		t.Error("MCP/question-Allow fehlt")
+	}
+	// deny-Rest bleibt.
+	deny := false
+	for _, p := range perms {
+		if p["permission"] == "execute" && p["action"] == "deny" {
+			deny = true
+		}
+	}
+	if !deny {
+		t.Error("execute-deny fehlt")
+	}
+	// Leer → deny-all-Fallback.
+	if got := openCodePermissionsFor(""); len(got) == 0 {
+		t.Error("Fallback darf nicht leer sein")
+	}
+}
+
+func TestOpenCodeFileHelpers(t *testing.T) {
+	if !openCodeUploadExtOK("a.pdf") || !openCodeUploadExtOK("B.PNG") {
+		t.Error("Allowlist pdf/png erwartet")
+	}
+	if openCodeUploadExtOK("evil.exe") || openCodeUploadExtOK("keine-endung") {
+		t.Error("exe/ohne-Endung muss abgewiesen werden")
+	}
+	if got := openCodeSafeName("../../etc/passwd"); got != "passwd" {
+		t.Errorf("Base-Sanitizing: %q", got)
+	}
+	if got := openCodeSafeName("  "); got != "" {
+		t.Errorf("leer → '': %q", got)
+	}
+	dir := "/workspaces/7/uploads/s3"
+	if p, ok := openCodeResolveInDir(dir, "abc.pdf"); !ok || p != dir+"/abc.pdf" {
+		t.Errorf("resolve ok: %q %v", p, ok)
+	}
+	if _, ok := openCodeResolveInDir(dir, "../evil"); ok {
+		t.Error("Traversal muss abgewiesen werden")
+	}
+	if _, ok := openCodeResolveInDir(dir, ""); ok {
+		t.Error("leer muss abgewiesen werden")
+	}
+	// uploadPromptPaths: nur existierende Dateien listen.
+	if got := uploadPromptPaths("/nonexistent-ws", 999, []string{"a.pdf"}); got != "" {
+		t.Errorf("fehlende Datei → '': %q", got)
+	}
+}
+
 func TestOpenCodeStep_PayloadContract(t *testing.T) {
 	// WS-Vertrag: type/session_id/step{key,kind,label,status,detail?,tool?}
 	step := openCodeStepView{Key: "tool:call_1", Kind: "tool", Label: "Ruft Stundenplan ab", Status: "done", Detail: "Mathe", Tool: "smarttable_get_schedule"}

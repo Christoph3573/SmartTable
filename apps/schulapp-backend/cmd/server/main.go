@@ -156,6 +156,14 @@ func main() {
 	// opencode-Container erreichbar/verbunden ist (JWT-Pflicht).
 	r.Get("/api/v1/integrations/opencode/mcp-status", srv.GetApiV1IntegrationsOpencodeMcpStatus)
 
+	// Lern-KI-Dateien (Upload → Sandbox, Outputs → Download): manuell
+	// registriert (multipart + File-Download passen nicht gut ins
+	// oapi-codegen-Schema), aber in openapi.yaml dokumentiert (JWT +
+	// Ownership pro Request, siehe handler/opencode_files.go).
+	r.Post("/api/v1/integrations/opencode/sessions/{id}/uploads", srv.PostApiV1IntegrationsOpencodeSessionsIdUploads)
+	r.Get("/api/v1/integrations/opencode/sessions/{id}/files", srv.GetApiV1IntegrationsOpencodeSessionsIdFiles)
+	r.Get("/api/v1/integrations/opencode/sessions/{id}/files/{name}", srv.GetApiV1IntegrationsOpencodeSessionsIdFileDownload)
+
 	api.HandlerWithOptions(srv, api.ChiServerOptions{
 		BaseRouter: r,
 	})

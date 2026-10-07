@@ -2674,6 +2674,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/opencode/sessions/{id}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dateien in die OpenCode-Sandbox hochladen (max. 5 Dateien à 10 MB, Allowlist pdf/txt/md/png/jpg/jpeg/csv/docx/xlsx/pptx) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        files?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Gespeicherte Uploads (Namen als file_names für POST .../messages verwenden) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeFile"][];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions/{id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent-Outputs einer Session auflisten (outputs/s{id}/, max. 50) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Output-Dateien mit Download-Links */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenCodeFile"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/opencode/sessions/{id}/files/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent-Output herunterladen (nur eigene Session, Traversal-geschützt) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Datei-Bytes (inline für pdf/txt/bilder, sonst attachment) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integrations/schoolconnect/status": {
         parameters: {
             query?: never;
@@ -3297,6 +3418,21 @@ export interface components {
         };
         SendOpenCodeMessageRequest: {
             content: string;
+            /** @description Upload-Referenzen aus POST .../uploads (gespeicherte Dateinamen in uploads/s{id}/). Optional. */
+            file_names?: string[];
+            /** @description Alias für file_names (Kompatibilität). */
+            file_ids?: string[];
+            /** @description Alias für file_names (Kompatibilität). */
+            file_paths?: string[];
+        };
+        OpenCodeFile: {
+            name: string;
+            /** Format: int64 */
+            size: number;
+            mime: string;
+            /** Format: date-time */
+            created_at: string;
+            download_url?: string;
         };
         OpenCodeStatus: {
             configured: boolean;

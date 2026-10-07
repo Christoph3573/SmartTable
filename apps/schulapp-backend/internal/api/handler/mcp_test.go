@@ -67,6 +67,8 @@ func TestMCPToolsListPublic(t *testing.T) {
 	want := map[string]bool{
 		"get_schedule": true, "get_substitutions": true, "get_homework": true,
 		"get_learning_plan": true, "get_vocabularies": true,
+		"get_profile": true, "get_mebis": true, "get_drive": true,
+		"create_vocab_set": true, "add_vocab_cards": true,
 	}
 	for _, tool := range res.Result.Tools {
 		delete(want, tool.Name)
@@ -193,6 +195,68 @@ func TestMCPCallTenantIsolation(t *testing.T) {
 		`{"jsonrpc":"2.0","id":9,"method":"tools/list"}`, "", "")
 	if listRec.Code != http.StatusOK {
 		t.Fatalf("SSE tools/list: status = %d", listRec.Code)
+	}
+}
+
+// TestMCPVocabWrite: create_vocab_set + add_vocab_cards (Ownership, Caps,
+// Dubletten-Skip). Fremd-set_id wird abgewiesen, >100 Karten/Call ebenso.
+func TestMCPVocabWrite(t *testing.T) {
+	resetDB(t)
+	srv := newTestServer(t)
+	schoolID := mustSchool(t, "MCP-Vokabel-Schule")
+	userA := mustUser(t, "va@schule.de", "student", &schoolID)
+	userB := mustUser(t, "vb@schule.de", "student", &schoolID)
+	tokenA := mustToken(t, userA, "student")
+	tokenB := mustToken(t, userB, "student")
+
+	call := func(token, body string) (string, bool) {
+		t.Helper()
+		rec := mcpPost(t, srv, "/api/v1/mcp", body, token, "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d (%s)", rec.Code, rec.Body.String())
+		}
+		var res map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		result, _ := res["result"].(map[string]any)
+		isErr, _ := result["isError"].(bool)
+		return mcpResultText(t, res), isErr
+	}
+
+	// 1. Set anlegen (Owner = Tenant aus JWT).
+	text, isErr := call(tokenA, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_vocab_set","arguments":{"title":"Bio-Test","source_lang":"de","target_lang":"en"}}}`)
+	if isErr || !strings.Contains(text, "set_id=") {
+		t.Fatalf("create_vocab_set fehlgeschlagen: err=%v %q", isErr, text)
+	}
+	var setID int
+	// set_id aus DB lesen (Titel eindeutig).
+	if err := testDB.QueryRow(`SELECT id FROM vocab_sets WHERE owner_id=$1 AND title='Bio-Test'`, userA).Scan(&setID); err != nil {
+		t.Fatalf("set nicht in DB: %v", err)
+	}
+
+	// 2. Karten anlegen + Dublette/Leer-Skip.
+	text, isErr = call(tokenA, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add_vocab_cards","arguments":{"set_id":`+itoa(setID)+`,"cards":[{"front":"Haus","back":"house"},{"front":"Haus","back":"house"},{"front":"","back":"x"}]}}}`)
+	if isErr || !strings.Contains(text, "1 Karten angelegt") || !strings.Contains(text, "2 übersprungen") {
+		t.Fatalf("add_vocab_cards Zählung falsch: err=%v %q", isErr, text)
+	}
+
+	// 3. Fremder User darf nicht in fremdes Set schreiben.
+	text, isErr = call(tokenB, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"add_vocab_cards","arguments":{"set_id":`+itoa(setID)+`,"cards":[{"front":"Baum","back":"tree"}]}}}`)
+	if !isErr || !strings.Contains(text, "Kein Zugriff") {
+		t.Fatalf("Fremd-Schreiben nicht abgewiesen: err=%v %q", isErr, text)
+	}
+
+	// 4. >100 Karten/Call ablehnen.
+	big := `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"create_vocab_set","arguments":{"title":"X","source_lang":"de","target_lang":"en"}}}`
+	_ = big
+	cards := make([]string, 0, 101)
+	for i := 0; i < 101; i++ {
+		cards = append(cards, `{"front":"f`+itoa(i)+`","back":"b`+itoa(i)+`"}`)
+	}
+	text, isErr = call(tokenA, `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"add_vocab_cards","arguments":{"set_id":`+itoa(setID)+`,"cards":[`+strings.Join(cards, ",")+`]}}}`)
+	if !isErr || !strings.Contains(text, "max. 100") {
+		t.Fatalf(">100-Cap nicht enforced: err=%v %q", isErr, text)
 	}
 }
 

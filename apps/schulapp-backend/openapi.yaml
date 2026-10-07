@@ -839,6 +839,38 @@ components:
       properties:
         content:
           type: string
+        file_names:
+          type: array
+          description: "Upload-Referenzen aus POST .../uploads (gespeicherte Dateinamen in uploads/s{id}/). Optional."
+          items:
+            type: string
+        file_ids:
+          type: array
+          description: "Alias für file_names (Kompatibilität)."
+          items:
+            type: string
+        file_paths:
+          type: array
+          description: "Alias für file_names (Kompatibilität)."
+          items:
+            type: string
+
+    OpenCodeFile:
+      type: object
+      required: [name, size, mime, created_at]
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+          format: int64
+        mime:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        download_url:
+          type: string
 
     OpenCodeStatus:
       type: object
@@ -2550,6 +2582,88 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/OpenCodeMessage"
+
+  /api/v1/integrations/opencode/sessions/{id}/uploads:
+    post:
+      tags: [integrations]
+      summary: Dateien in die OpenCode-Sandbox hochladen (max. 5 Dateien à 10 MB, Allowlist pdf/txt/md/png/jpg/jpeg/csv/docx/xlsx/pptx)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "201":
+          description: Gespeicherte Uploads (Namen als file_names für POST .../messages verwenden)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenCodeFile"
+
+  /api/v1/integrations/opencode/sessions/{id}/files:
+    get:
+      tags: [integrations]
+      summary: Agent-Outputs einer Session auflisten (outputs/s{id}/, max. 50)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Output-Dateien mit Download-Links
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenCodeFile"
+
+  /api/v1/integrations/opencode/sessions/{id}/files/{name}:
+    get:
+      tags: [integrations]
+      summary: Agent-Output herunterladen (nur eigene Session, Traversal-geschützt)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Datei-Bytes (inline für pdf/txt/bilder, sonst attachment)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
 
   /api/v1/integrations/schoolconnect/status:
     get:
