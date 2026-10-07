@@ -33,7 +33,7 @@ export function SchoolsPage() {
 
       {showCreate && (
         <form
-          className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-5"
+          className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-green-200 bg-green-50 p-5"
           onSubmit={(e) => { e.preventDefault(); if (name.trim()) create.mutate(name.trim()); }}
         >
           <label className="min-w-60 flex-1 text-sm font-medium text-gray-700">Schulname

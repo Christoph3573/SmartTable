@@ -94,7 +94,7 @@ export function VocabPage() {
                   onClick={() => { setSetId(set.id); setQuiz(null); }}
                   className={`mb-1 w-full rounded-lg border px-3 py-3 text-left transition-colors ${
                     set.id === activeSet?.id
-                      ? "border-indigo-200 bg-white text-indigo-950 shadow-sm"
+                      ? "border-green-200 bg-white text-green-950 shadow-sm"
                       : "border-transparent text-gray-700 hover:bg-white"
                   }`}
                 >
@@ -391,11 +391,11 @@ function QuizView({
       </div>
       <div className="p-5">
         <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
-          <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${(quiz.index / total) * 100}%` }} />
+          <div className="h-full rounded-full bg-green-600 transition-all" style={{ width: `${(quiz.index / total) * 100}%` }} />
         </div>
         <button
           onClick={() => onAdvance({ ...quiz, revealed: !quiz.revealed })}
-          className="grid min-h-56 w-full place-items-center rounded-xl border border-gray-200 bg-gray-50 p-8 text-center transition-colors hover:border-indigo-300"
+          className="grid min-h-56 w-full place-items-center rounded-xl border border-gray-200 bg-gray-50 p-8 text-center transition-colors hover:border-green-300"
         >
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400">{questionLang}</p>
@@ -403,12 +403,12 @@ function QuizView({
             {current.hint && !quiz.revealed && <p className="mt-3 text-sm text-gray-500">Hinweis: {current.hint}</p>}
             {quiz.revealed ? (
               <>
-                <p className="mt-4 text-xs font-bold uppercase tracking-wider text-indigo-500">{answerLang}</p>
-                <p className="mt-1 text-2xl font-semibold text-indigo-700">{answer}</p>
+                <p className="mt-4 text-xs font-bold uppercase tracking-wider text-green-500">{answerLang}</p>
+                <p className="mt-1 text-2xl font-semibold text-green-700">{answer}</p>
                 <p className="mt-3 text-xs text-gray-400">Zum Zudecken erneut tippen</p>
               </>
             ) : (
-              <p className="mt-4 text-sm font-medium text-indigo-600">Tippen zum Aufdecken</p>
+              <p className="mt-4 text-sm font-medium text-green-600">Tippen zum Aufdecken</p>
             )}
           </div>
         </button>

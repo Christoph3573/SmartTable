@@ -189,7 +189,7 @@ export function Sidebar() {
         className={({ isActive }) =>
           `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
           ${isActive
-            ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+            ? "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300"
             : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
           }`
         }
@@ -197,7 +197,7 @@ export function Sidebar() {
         {item.icon}
         <span className="flex-1">{item.label}</span>
         {item.to === "/chat" && unreadTotal > 0 && (
-          <span className="grid min-w-5 place-items-center rounded-full bg-indigo-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+          <span className="grid min-w-5 place-items-center rounded-full bg-green-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
             {unreadTotal > 9 ? "9+" : unreadTotal}
           </span>
         )}
@@ -215,6 +215,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       <div className="sidebar-header flex h-20 items-center gap-3 border-b border-gray-200 px-6 dark:border-gray-700">
+        <img src="/icon.png" alt="" className="size-8 rounded-lg object-contain" />
         <span className="font-bold tracking-tight text-gray-900 dark:text-white">SmartTable</span>
         <span className="ml-auto flex items-center gap-1">
           <ThemeToggle />
@@ -235,7 +236,7 @@ export function Sidebar() {
           </div>
         ))}
         {provider === "schoolconnect" && (
-          <p className="mt-3 rounded-lg bg-indigo-50 px-3 py-2 text-[11px] font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+          <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-[11px] font-medium text-green-700 dark:bg-green-950/40 dark:text-green-300">
             Datenquelle: SchoolConnect
           </p>
         )}
@@ -293,7 +294,7 @@ export function Sidebar() {
           title="Benutzermenü öffnen"
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
         >
-          <div className="flex size-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-medium text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+          <div className="flex size-8 items-center justify-center rounded-full bg-green-100 text-sm font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
             {user?.first_name?.[0]}{user?.last_name?.[0]}
           </div>
           <div className="flex-1 overflow-hidden">

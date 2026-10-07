@@ -120,7 +120,7 @@ export function TimetablePage() {
             <div className="empty-state">
               <span aria-hidden="true">✦</span>
               <strong>Nicht beim Schülerportal angemeldet</strong>
-              <p>Bitte in den <Link className="font-semibold text-indigo-700 hover:underline" to="/settings">Einstellungen → SchoolConnect</Link> anmelden.</p>
+              <p>Bitte in den <Link className="font-semibold text-green-700 hover:underline" to="/settings">Einstellungen → SchoolConnect</Link> anmelden.</p>
               <Button size="sm" variant="secondary" onClick={() => external.refetch()}>Erneut versuchen</Button>
             </div>
           ) : (
@@ -161,7 +161,7 @@ export function TimetablePage() {
                         const label = scTimetableEntryLabel(entry);
                         return (
                           <td key={day.value} className="border-b border-gray-50 px-1.5 py-1.5 align-top">
-                            <div className="flex h-14 flex-col justify-center rounded-lg border border-indigo-100 bg-indigo-50 px-2 py-1 text-xs text-indigo-800">
+                            <div className="flex h-14 flex-col justify-center rounded-lg border border-green-100 bg-green-50 px-2 py-1 text-xs text-green-800">
                               <strong className="font-semibold">{label.subject}</strong>
                               <span className="text-[11px] opacity-80">{label.room}</span>
                             </div>
@@ -238,7 +238,7 @@ export function TimetablePage() {
                           <CustomCell course={custom} />
                         ) : canManage ? (
                           <button
-                            className="flex h-14 w-full items-center justify-center rounded-lg border border-dashed border-gray-200 text-xs text-gray-300 hover:border-indigo-300 hover:text-indigo-500"
+                            className="flex h-14 w-full items-center justify-center rounded-lg border border-dashed border-gray-200 text-xs text-gray-300 hover:border-green-300 hover:text-green-500"
                             onClick={() => setEditing({ dayOfWeek: day.value, period })}
                           >
                             +
@@ -314,7 +314,7 @@ function TimetableCell({
           ? "border-red-200 bg-red-50 text-red-700 line-through decoration-red-400"
           : substituted
           ? "border-amber-200 bg-amber-50 text-amber-800"
-          : "border-indigo-100 bg-indigo-50 text-indigo-800"
+          : "border-green-100 bg-green-50 text-green-800"
       }`}
     >
       <strong className="font-semibold">{subjectShort(entry.lesson.subject_id)}</strong>

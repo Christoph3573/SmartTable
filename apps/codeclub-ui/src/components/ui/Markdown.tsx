@@ -41,7 +41,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       const href = link ? safeHref(link[2]) : null;
       out.push(
         link && href ? (
-          <a key={key} className="text-indigo-600 underline" href={href} target="_blank" rel="noreferrer">
+          <a key={key} className="text-green-600 underline" href={href} target="_blank" rel="noreferrer">
             {link[1]}
           </a>
         ) : (

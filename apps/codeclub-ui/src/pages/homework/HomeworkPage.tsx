@@ -66,7 +66,7 @@ export function HomeworkPage() {
             <div className="empty-state">
               <span aria-hidden="true">✦</span>
               <strong>Nicht beim Schülerportal angemeldet</strong>
-              <p>Bitte in den <Link className="font-semibold text-indigo-700 hover:underline" to="/settings">Einstellungen → SchoolConnect</Link> anmelden.</p>
+              <p>Bitte in den <Link className="font-semibold text-green-700 hover:underline" to="/settings">Einstellungen → SchoolConnect</Link> anmelden.</p>
               <Button size="sm" variant="secondary" onClick={() => external.refetch()}>Erneut versuchen</Button>
             </div>
           ) : (
@@ -84,7 +84,7 @@ export function HomeworkPage() {
               const due = field(item, "faellig", "due", "datum", "date", "abgabe");
               return (
                 <div className="data-row" key={index}>
-                  <span className="grid size-11 place-items-center rounded-lg bg-indigo-50 text-center font-mono text-xs text-indigo-700">SC</span>
+                  <span className="grid size-11 place-items-center rounded-lg bg-green-50 text-center font-mono text-xs text-green-700">SC</span>
                   <div className="data-row-main"><strong>{title || `Aufgabe ${index + 1}`} <span className="pill blue ml-2">SchoolConnect</span></strong><p>{description || "Keine weitere Beschreibung."}{due ? ` · Fällig: ${due}` : ""}</p></div>
                 </div>
               );
@@ -101,7 +101,7 @@ export function HomeworkPage() {
       const own = ownSubmission.get(item.id);
       const graded = own?.status === "graded";
       return <div className="data-row" key={item.id}>
-        <time className={`grid size-11 place-items-center rounded-lg text-center font-mono text-xs ${late ? "bg-red-50 text-red-700" : "bg-indigo-50 text-indigo-700"}`}>{formatDate(item.due_date, { day: "2-digit", month: "short" })}</time>
+        <time className={`grid size-11 place-items-center rounded-lg text-center font-mono text-xs ${late ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{formatDate(item.due_date, { day: "2-digit", month: "short" })}</time>
         <div className="data-row-main"><strong>{item.title} <span className="pill blue ml-2">{subject(item.subject_id)}</span></strong><p>{item.description || "Keine weitere Beschreibung."}</p></div>
         {isTeacher ? <div className="flex gap-3"><button className="text-button" onClick={() => setGrading(item)}>Abgaben</button><button className="text-button" onClick={() => setEditing(item)}>Bearbeiten</button><button className="text-button text-red-600" onClick={() => remove.mutate(item.id)}>Löschen</button></div>
         : graded ? <Button size="sm" variant="secondary" disabled>Benotet ({own!.grade})</Button>

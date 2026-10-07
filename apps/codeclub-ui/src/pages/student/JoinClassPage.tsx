@@ -81,7 +81,7 @@ export function JoinClassPage() {
         </div>
       )}
 
-      <p className="mt-6 text-sm text-gray-500"><Link className="font-medium text-indigo-700 hover:underline" to="/dashboard">Zurück zum Dashboard</Link></p>
+      <p className="mt-6 text-sm text-gray-500"><Link className="font-medium text-green-700 hover:underline" to="/dashboard">Zurück zum Dashboard</Link></p>
     </div>
   );
 }

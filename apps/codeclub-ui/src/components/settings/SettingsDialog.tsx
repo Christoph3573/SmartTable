@@ -77,7 +77,7 @@ export function SettingsContent() {
                 onClick={() => setMode(option.value)}
                 className={`rounded-xl border p-3 text-left transition-colors ${
                   mode === option.value
-                    ? "border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30"
+                    ? "border-green-500 bg-green-50 dark:border-green-400 dark:bg-green-900/30"
                     : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                 }`}
               >
@@ -104,7 +104,7 @@ export function SettingsContent() {
                 onClick={() => setProvider(option.value)}
                 className={`rounded-xl border p-3 text-left transition-colors ${
                   provider === option.value
-                    ? "border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30"
+                    ? "border-green-500 bg-green-50 dark:border-green-400 dark:bg-green-900/30"
                     : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                 }`}
               >

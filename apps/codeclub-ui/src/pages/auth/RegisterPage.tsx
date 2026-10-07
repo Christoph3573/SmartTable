@@ -3,6 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { schoolApi } from "../../api/school";
+import { LogoMark } from "../../components/ui/Logo";
+
+const tileLabel = "text-sm font-medium text-green-50";
+const tileInput = "mt-1 w-full rounded-lg border border-white/40 bg-white/95 px-3 py-2 text-gray-900 placeholder:text-gray-500";
+const tileSelect = "mt-1 w-full rounded-lg border border-white/40 bg-white/95 px-3 py-2 text-gray-900";
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -56,54 +61,54 @@ export function RegisterPage() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="rounded-2xl border border-[#e1e3dc] bg-white p-8 shadow-[0_20px_50px_rgba(48,63,52,.08)]">
+      <div className="rounded-2xl border border-white/15 bg-green-950/55 p-8 text-white shadow-xl backdrop-blur-xl dark:bg-black/55">
         <div className="mb-8 text-center">
-          <span className="mx-auto mb-4 grid size-11 place-items-center rounded-xl bg-indigo-600 text-2xl font-bold text-white">S</span>
-          <p className="eyebrow">SmartTable</p>
-          <h1 className="text-3xl text-[#24283a]">Konto erstellen</h1>
-          <p className="mt-3 text-sm text-[#747a71]">Registriere dich als Schüler:in deiner Schule. Dein Klassenbeitritt wird danach von einer Lehrkraft freigegeben.</p>
+          <div className="mx-auto mb-4 w-fit">
+            <LogoMark size={44} />
+          </div>
+          <h1 className="text-3xl text-white">Konto erstellen</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-medium text-gray-700">Vorname
-              <input className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
+            <label className={tileLabel}>Vorname
+              <input className={tileInput} required value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
             </label>
-            <label className="text-sm font-medium text-gray-700">Nachname
-              <input className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
+            <label className={tileLabel}>Nachname
+              <input className={tileInput} required value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
             </label>
           </div>
-          <label className="text-sm font-medium text-gray-700">E-Mail
-            <input className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" type="email" required placeholder="max.mustermann@schule.de" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+          <label className={tileLabel}>E-Mail
+            <input className={tileInput} type="email" required placeholder="max.mustermann@schule.de" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
           </label>
-          <label className="text-sm font-medium text-gray-700">Passwort (min. 8 Zeichen)
-            <input className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" type="password" required minLength={8} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+          <label className={tileLabel}>Passwort (min. 8 Zeichen)
+            <input className={tileInput} type="password" required minLength={8} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
           </label>
-          <label className="text-sm font-medium text-gray-700">Schule
-            <select className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required value={schoolId} onChange={(e) => { setSchoolId(e.target.value); setClassId(""); }}>
+          <label className={tileLabel}>Schule
+            <select className={tileSelect} required value={schoolId} onChange={(e) => { setSchoolId(e.target.value); setClassId(""); }}>
               <option value="">Schule wählen</option>
               {schools.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
-          {schools.isError && <p className="text-sm text-red-600">Schulen konnten nicht geladen werden.</p>}
+          {schools.isError && <p className="text-sm text-red-200">Schulen konnten nicht geladen werden.</p>}
           {schoolId && (
-            <label className="text-sm font-medium text-gray-700">Klasse <span className="font-normal text-gray-400">(optional — Beitrittsanfrage)</span>
-              <select className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" value={classId} onChange={(e) => setClassId(e.target.value)}>
+            <label className={tileLabel}>Klasse <span className="font-normal text-green-100/70">(optional — Beitrittsanfrage)</span>
+              <select className={tileSelect} value={classId} onChange={(e) => setClassId(e.target.value)}>
                 <option value="">Später wählen</option>
                 {classes.data?.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.school_year})</option>)}
               </select>
             </label>
           )}
 
-          {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+          {error && <div className="rounded-lg border border-red-200/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">{error}</div>}
 
-          <button type="submit" disabled={pending} className="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+          <button type="submit" disabled={pending} className="mt-2 w-full rounded-lg bg-green-500 px-4 py-2.5 text-sm font-semibold text-green-950 transition-colors hover:bg-green-400 disabled:opacity-50">
             {pending ? "Wird erstellt …" : "Registrieren"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Bereits ein Konto? <Link className="font-semibold text-indigo-700 hover:underline" to="/login">Anmelden</Link>
+        <p className="mt-6 text-center text-sm text-green-100/80">
+          Bereits ein Konto? <Link className="font-semibold text-white hover:underline" to="/login">Anmelden</Link>
         </p>
       </div>
     </div>

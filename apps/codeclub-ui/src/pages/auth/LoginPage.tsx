@@ -33,18 +33,15 @@ export function LoginPage() {
 
   return (
     <div className="w-full max-w-sm">
-      <div className="rounded-2xl border border-[#e1e3dc] bg-white p-8 shadow-[0_20px_50px_rgba(48,63,52,.08)]">
-        <div className="mb-8 text-center">
-          <span className="mx-auto mb-4 grid size-11 place-items-center rounded-xl bg-indigo-600 text-2xl font-bold text-white">S</span>
-          <p className="eyebrow">SmartTable</p>
-          <h1 className="text-3xl text-[#24283a]">Willkommen zurück</h1>
-          <p className="mt-3 text-sm text-[#747a71]">Melde dich an, um deinen Schultag zu öffnen.</p>
-        </div>
+      <div className="rounded-2xl border border-white/15 bg-green-950/55 p-6 text-white shadow-xl backdrop-blur-xl md:p-8 dark:bg-black/55">
+        <h1 className="sr-only">Anmelden</h1>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Input
             id="email"
             label="E-Mail"
+            labelClassName="text-green-50"
+            className="border-white/40 bg-white/95 text-gray-900 placeholder:text-gray-500"
             type="email"
             placeholder="max.mustermann@schule.de"
             value={email}
@@ -56,6 +53,8 @@ export function LoginPage() {
           <Input
             id="password"
             label="Passwort"
+            labelClassName="text-green-50"
+            className="border-white/40 bg-white/95 text-gray-900 placeholder:text-gray-500"
             type="password"
             placeholder="••••••••"
             value={password}
@@ -65,24 +64,24 @@ export function LoginPage() {
           />
 
           {location.state?.registered && !error && (
-            <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+            <div className="mb-4 rounded-lg border border-green-200/30 bg-green-400/15 px-4 py-3 text-sm text-green-100">
               Konto erstellt. Melde dich jetzt an — deine Klassenanfrage wartet auf Freigabe.
             </div>
           )}
 
           {error && (
-            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+            <div className="rounded-lg border border-red-200/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
               {error}
             </div>
           )}
 
-          <Button type="submit" loading={isLoading} className="mt-2 w-full">
+          <Button type="submit" loading={isLoading} className="mt-2 w-full bg-green-500 font-semibold text-green-950 hover:bg-green-400 dark:bg-green-500 dark:hover:bg-green-400">
             Anmelden
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Noch kein Konto? <Link className="font-semibold text-indigo-700 hover:underline" to="/register">Konto erstellen</Link>
+        <p className="mt-6 text-center text-sm text-green-100/80">
+          Noch kein Konto? <Link className="font-semibold text-white hover:underline" to="/register">Konto erstellen</Link>
         </p>
       </div>
     </div>

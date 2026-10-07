@@ -285,7 +285,7 @@ function CourseGroup({
           <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
             <input
               type="checkbox"
-              className="size-4 accent-indigo-600"
+              className="size-4 accent-green-600"
               checked={allSelected}
               ref={(el) => {
                 if (el) el.indeterminate = !allSelected && someSelected;
@@ -307,7 +307,7 @@ function CourseGroup({
             <label key={`${course.provider}:${course.external_key}`} className="data-row cursor-pointer">
               <input
                 type="checkbox"
-                className="size-4 accent-indigo-600"
+                className="size-4 accent-green-600"
                 checked={selected}
                 onChange={(event) => onToggle(course, event.target.checked)}
               />
@@ -444,7 +444,7 @@ function CourseDialog({
           </div>
           <button
             type="button"
-            className="mt-2 text-sm font-medium text-indigo-700 hover:text-indigo-900 dark:text-indigo-300"
+            className="mt-2 text-sm font-medium text-green-700 hover:text-green-900 dark:text-green-300"
             onClick={() => setLessons((prev) => [...prev, { day_of_week: 1, period: prev.length + 1, room: "" }])}
           >
             + Stunde hinzufügen

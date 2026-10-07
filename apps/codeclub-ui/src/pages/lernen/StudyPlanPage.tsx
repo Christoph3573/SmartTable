@@ -106,7 +106,7 @@ export function StudyPlanPage() {
           ) : (
             mySubjects.map((subject) => (
               <div className="data-row" key={subject.id}>
-                <span className="grid size-11 place-items-center rounded-lg bg-indigo-50 text-center font-mono text-xs text-indigo-700">
+                <span className="grid size-11 place-items-center rounded-lg bg-green-50 text-center font-mono text-xs text-green-700">
                   {subject.short}
                 </span>
                 <div className="data-row-main">
@@ -155,7 +155,7 @@ export function StudyPlanPage() {
               <input className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-sm" value={jahrgangsstufe} onChange={(e) => setJahrgangsstufe(e.target.value)} placeholder="z. B. 9" />
             </label>
             <div className="flex items-end sm:col-span-2">
-              <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+              <button type="submit" className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">
                 Lehrplan suchen
               </button>
             </div>

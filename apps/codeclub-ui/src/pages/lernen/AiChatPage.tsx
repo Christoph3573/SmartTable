@@ -293,7 +293,7 @@ export function AiChatPage() {
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Chats</h2>
             <button
               type="button"
-              className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+              className="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700"
               onClick={() => void createSession()}
             >
               + Neu
@@ -307,7 +307,7 @@ export function AiChatPage() {
                   key={session.id}
                   className={`group mb-1 flex items-center rounded-lg border ${
                     active
-                      ? "border-indigo-200 bg-white shadow-sm dark:border-indigo-800 dark:bg-gray-800"
+                      ? "border-green-200 bg-white shadow-sm dark:border-green-800 dark:bg-gray-800"
                       : "border-transparent hover:bg-white dark:hover:bg-gray-800"
                   }`}
                 >
@@ -317,7 +317,7 @@ export function AiChatPage() {
                     className="min-w-0 flex-1 px-3 py-2.5 text-left"
                     title={`${session.message_count} Nachrichten · Workspace ${session.workspace}`}
                   >
-                    <span className={`block truncate text-sm font-medium ${active ? "text-indigo-900 dark:text-indigo-200" : "text-gray-700 dark:text-gray-200"}`}>
+                    <span className={`block truncate text-sm font-medium ${active ? "text-green-900 dark:text-green-200" : "text-gray-700 dark:text-gray-200"}`}>
                       {session.title}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-gray-400">
@@ -375,13 +375,13 @@ export function AiChatPage() {
                 const own = message.role === "user";
                 return (
                   <div className={`max-w-[80%] ${own ? "self-end" : "self-start"}`} key={message.id}>
-                    <p className={`mb-1 px-1 text-[11px] font-medium ${own ? "text-right text-indigo-700" : "text-gray-500"}`}>
+                    <p className={`mb-1 px-1 text-[11px] font-medium ${own ? "text-right text-green-700" : "text-gray-500"}`}>
                       {own ? "Du" : "Lern-KI"}
                     </p>
                     <div
                       className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
                         own
-                          ? "rounded-br-sm bg-indigo-600 text-white"
+                          ? "rounded-br-sm bg-green-600 text-white"
                           : "rounded-bl-sm bg-white text-gray-800 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700"
                       }`}
                     >
@@ -393,7 +393,7 @@ export function AiChatPage() {
                           className="break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
                         />
                       )}
-                      <time className={`mt-1.5 block text-[.65rem] ${own ? "text-indigo-100" : "text-gray-400"}`}>
+                      <time className={`mt-1.5 block text-[.65rem] ${own ? "text-green-100" : "text-gray-400"}`}>
                         {formatDate(message.created_at, { hour: "2-digit", minute: "2-digit" })}
                       </time>
                     </div>
