@@ -24,3 +24,6 @@ bin/
 *.log
 .agents/
 skills-lock.json
+
+#kilo
+./kilo
