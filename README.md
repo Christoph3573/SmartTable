@@ -5,6 +5,7 @@
 - [ ] Thinking-Steps im KI-Chat anzeigen (geht noch nicht)
 - [ ] Random Crashes wo Lern-KI sagt OpenCode-Backend ist offline, passiert anscheinend bei File-Upload
 - [ ] Bei Admin- bzw. Lehrer-Account die Administration besser machen
+- [ ] Manchmal kann der opencode Agent nicht den Vertretungsplan (z.b. von Schoolconnect) lesen. 
 
 `apps/codeclub-ui` (React 19 + Vite + TS) und `apps/schulapp-backend` (Go + chi + Postgres) — Roadmap und Architektur-Docs in [`docs/`](docs/).
 
