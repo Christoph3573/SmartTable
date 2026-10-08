@@ -1,6 +1,7 @@
 import { create } from "zustand";
+import { providerApi, type DataProvider } from "../api/provider";
 
-export type DataProvider = "smarttable" | "schoolconnect";
+export type { DataProvider };
 
 const STORAGE_KEY = "smarttable-data-provider";
 
@@ -31,5 +32,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       // localStorage nicht verfügbar -> nur Session anwenden
     }
     set({ provider });
+    void providerApi.set(provider).catch(() => {});
   },
 }));

@@ -260,6 +260,30 @@ func TestMCPVocabWrite(t *testing.T) {
 	}
 }
 
+// TestMCPDateInRange prüft den clientseitigen inklusiven Zeitraum-Filter der
+// Schülerportal-Vertretungen (SchoolConnect-Fix: Zeiträume statt Exakt-Datum).
+func TestMCPDateInRange(t *testing.T) {
+	cases := []struct {
+		name        string
+		d, from, to string
+		want        bool
+	}{
+		{"leerer Datumswert bleibt", "", "2025-01-01", "2025-01-07", true},
+		{"in Range", "2025-01-03", "2025-01-01", "2025-01-07", true},
+		{"vor from", "2024-12-31", "2025-01-01", "2025-01-07", false},
+		{"nach to", "2025-01-08", "2025-01-01", "2025-01-07", false},
+		{"from==to exakt", "2025-01-01", "2025-01-01", "2025-01-01", true},
+		{"unparsebarer Datumswert ohne Grenzen bleibt", "irgendwann", "", "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := mcpDateInRange(tc.d, tc.from, tc.to); got != tc.want {
+				t.Fatalf("mcpDateInRange(%q,%q,%q) = %v, want %v", tc.d, tc.from, tc.to, got, tc.want)
+			}
+		})
+	}
+}
+
 func mcpResultText(t *testing.T, res map[string]any) string {
 	t.Helper()
 	result, _ := res["result"].(map[string]any)

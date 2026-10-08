@@ -152,6 +152,12 @@ func main() {
 		r.Delete("/{id}", srv.DeleteApiV1CoursesId)
 	})
 
+	// Daten-Provider (Schuldaten-Quelle SmartTable/SchoolConnect): Der
+	// Frontend-Umschalter wird serverseitig gespeichert, damit der
+	// OpenCode-MCP ihn respektieren kann (JWT-Pflicht wie alle API-Routen).
+	r.Get("/api/v1/me/provider", srv.GetApiV1MeProvider)
+	r.Patch("/api/v1/me/provider", srv.PatchApiV1MeProvider)
+
 	// MCP-Diagnose: prüft, ob der smarttable-MCP-Server aus dem
 	// opencode-Container erreichbar/verbunden ist (JWT-Pflicht).
 	r.Get("/api/v1/integrations/opencode/mcp-status", srv.GetApiV1IntegrationsOpencodeMcpStatus)

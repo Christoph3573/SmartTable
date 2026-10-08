@@ -401,7 +401,8 @@ func (h *Server) mcpResolveClass(r *http.Request, userID int, role string, args 
 func (h *Server) mcpSchedule(r *http.Request, userID int, role string, args map[string]any) (string, bool) {
 	// Ohne SmartTable-Klasse (z. B. SchoolConnect-Nutzer) auf das
 	// Schülerportal zurückfallen, damit die KI trotzdem echte Daten bekommt.
-	if len(h.mcpUserClasses(r, userID, role)) == 0 {
+	// Ebenso, wenn der Nutzer den Daten-Provider 'schoolconnect' gewählt hat.
+	if h.userDataProvider(r, userID) == "schoolconnect" || len(h.mcpUserClasses(r, userID, role)) == 0 {
 		return h.mcpScheduleExternal(r, userID)
 	}
 	classID, errText, isErr := h.mcpResolveClass(r, userID, role, args)
@@ -493,7 +494,7 @@ func mcpWeekRange(weekOf string) (time.Time, time.Time) {
 
 func (h *Server) mcpSubstitutions(r *http.Request, userID int, role string, args map[string]any) (string, bool) {
 	own := h.mcpUserClasses(r, userID, role)
-	if len(own) == 0 {
+	if h.userDataProvider(r, userID) == "schoolconnect" || len(own) == 0 {
 		return h.mcpSubstitutionsExternal(r, userID, args)
 	}
 	from := mcpStrArg(args, "date_from")
@@ -523,9 +524,9 @@ func (h *Server) mcpSubstitutions(r *http.Request, userID int, role string, args
 		LEFT JOIN classes c ON c.id=sub.class_id
 		LEFT JOIN subjects s ON s.id=sub.subject_id
 		WHERE sub.date BETWEEN $1::date AND $2::date
-		  AND (sub.class_id IS NULL OR $3 IS NULL OR sub.class_id=$3)
+		  AND (sub.class_id IS NULL OR $3::int IS NULL OR sub.class_id=$3::int)
 		  AND (sub.class_id IS NULL OR EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=sub.class_id AND cm.user_id=$4)
-		       OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=sub.class_id AND ct.user_id=$4)`
+		       OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=sub.class_id AND ct.user_id=$4))`
 	rowsArgs := []any{from, to, classFilter, userID}
 	if isSuperadmin(role) {
 		query = `SELECT sub.date, sub.period, c.name, s.name, sub.type, sub.room, sub.note
@@ -585,7 +586,7 @@ func (h *Server) mcpSubstitutions(r *http.Request, userID int, role string, args
 
 func (h *Server) mcpHomework(r *http.Request, userID int, role string, args map[string]any) (string, bool) {
 	own := h.mcpUserClasses(r, userID, role)
-	if len(own) == 0 {
+	if h.userDataProvider(r, userID) == "schoolconnect" || len(own) == 0 {
 		return h.mcpHomeworkExternal(r, userID)
 	}
 	var classFilter any
@@ -702,18 +703,13 @@ func (h *Server) mcpScheduleExternal(r *http.Request, userID int) (string, bool)
 }
 
 // mcpSubstitutionsExternal liefert die Schülerportal-Vertretungen als Text.
+//
+// SchoolConnects `vertretungsplan?datum=` filtert per exaktem String-Vergleich
+// → ein Zeitraum lieferte nur den Starttag (oder nichts). Deshalb holen wir
+// hier ALLE Einträge und filtern inklusiv clientseitig nach from..to.
 func (h *Server) mcpSubstitutionsExternal(r *http.Request, userID int, args map[string]any) (string, bool) {
-	params := urlValues{}
-	if datum := mcpStrArg(args, "date_from"); datum != "" {
-		params["datum"] = datum
-	} else if datum := mcpStrArg(args, "date"); datum != "" {
-		params["datum"] = datum
-	}
 	function := "vertretungsplan"
 	target := h.schoolConnectBase() + "/api/schuelerportal/" + function
-	if len(params) > 0 {
-		target += "?" + params.encode()
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 	status, raw, err := schoolConnectDo(ctx, schoolConnectClient(), http.MethodGet, target, itoa(userID), nil)
@@ -731,14 +727,46 @@ func (h *Server) mcpSubstitutionsExternal(r *http.Request, userID int, args map[
 	if len(env.Data.Eintraege) == 0 {
 		return "Das Schülerportal meldet aktuell keine Vertretungen.", false
 	}
+	// from = date_from, to = date_to. Nur `date` (kein date_from und kein
+	// date_to) → Einzeltag-Alias, also from == to. Keine Angabe → kein Filter.
+	from := mcpStrArg(args, "date_from")
+	to := mcpStrArg(args, "date_to")
+	if from == "" && to == "" {
+		if single := mcpStrArg(args, "date"); single != "" {
+			from, to = single, single
+		}
+	}
 	lines := make([]string, 0, len(env.Data.Eintraege))
 	for _, e := range env.Data.Eintraege {
-		lines = append(lines, "• "+mcpAnyStr(e, "date", "datum", "tag")+" "+
+		date := mcpAnyStr(e, "date", "datum", "tag")
+		if !mcpDateInRange(date, from, to) {
+			continue
+		}
+		lines = append(lines, "• "+date+" "+
 			mcpAnyStr(e, "hour", "stunde", "period")+". Std: "+
 			mcpAnyStr(e, "uf", "kurs", "fach", "class")+
 			mcpSubDetail(e))
 	}
+	if len(lines) == 0 {
+		return "Keine Vertretungen im angegebenen Zeitraum.", false
+	}
 	return "Vertretungen (Schülerportal via SchoolConnect):\n" + strings.Join(lines, "\n"), false
+}
+
+// mcpDateInRange prüft einen Eintrags-Datum-String gegen den inklusiven
+// Zeitraum [from, to] (ISO "YYYY-MM-DD" ist lexikografisch vergleichbar).
+// Leerer Datumswert bleibt erhalten; leere Grenzen filtern nicht.
+func mcpDateInRange(d, from, to string) bool {
+	if d == "" {
+		return true
+	}
+	if from != "" && d < from {
+		return false
+	}
+	if to != "" && d > to {
+		return false
+	}
+	return true
 }
 
 func mcpSubDetail(e map[string]any) string {

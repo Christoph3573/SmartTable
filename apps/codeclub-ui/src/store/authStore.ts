@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { authApi, type User } from "../api/auth";
 import { setAccessToken } from "../api/client";
 import { queryClient } from "../api/queryClient";
+import { providerApi } from "../api/provider";
+import { useSettingsStore } from "./settingsStore";
 
 type AuthState = {
   user: User | null;
@@ -50,6 +52,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       setAccessToken(res.data.access_token);
       const meRes = await authApi.me();
       set({ user: meRes.data, isInitialized: true });
+
+      // Server-Einstellung adoptieren (best effort), damit ein Login auf
+      // einem neuen Gerät die dort gewählte Datenquelle übernimmt.
+      try {
+        const serverProvider = await providerApi.get();
+        if (useSettingsStore.getState().provider !== serverProvider) {
+          useSettingsStore.getState().setProvider(serverProvider);
+        }
+      } catch {
+        // Server nicht erreichbar → lokale Wahl behalten
+      }
     } catch {
       set({ user: null, isInitialized: true });
     }
