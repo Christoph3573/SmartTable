@@ -42,7 +42,9 @@ func mcpPost(t *testing.T, srv *Server, target, body, token, sessionToken string
 		req.Header.Set("X-Session-Token", sessionToken)
 	}
 	rec := httptest.NewRecorder()
-	srv.HandleMCP(rec, req)
+	// Wie in Produktion: /api/v1/mcp parst ein vorhandenes JWT optional
+	// (X-Session-Token bleibt der Fallback, den HandleMCP selbst auflöst).
+	appmw.OptionalAuth(srv.JWTSecret)(http.HandlerFunc(srv.HandleMCP)).ServeHTTP(rec, req)
 	return rec
 }
 
@@ -171,7 +173,7 @@ func TestMCPCallTenantIsolation(t *testing.T) {
 	serverDone := make(chan struct{})
 	go func() {
 		defer close(serverDone)
-		srv.HandleMCP(streamRec, streamReq)
+		appmw.OptionalAuth(srv.JWTSecret)(http.HandlerFunc(srv.HandleMCP)).ServeHTTP(streamRec, streamReq)
 	}()
 	deadline := time.Now().Add(3 * time.Second)
 	var body string

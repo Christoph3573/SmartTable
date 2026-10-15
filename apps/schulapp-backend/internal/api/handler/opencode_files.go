@@ -96,10 +96,13 @@ func openCodeNewSuffix() string {
 	return hex.EncodeToString(raw[:])
 }
 
-// openCodeResolveInDir löst name gegen dir auf (Traversal-Guard).
+// openCodeResolveInDir löst name gegen dir auf (Traversal-Guard). name muss
+// ein reiner Dateiname sein — Pfadanteile (z. B. "../evil", "a/b") werden
+// abgewiesen, statt sie stillschweigend zu "sanitizen".
 func openCodeResolveInDir(dir, name string) (string, bool) {
-	safe := filepath.Base(strings.TrimSpace(name))
-	if safe == "" || safe == "." || safe == "/" {
+	trimmed := strings.TrimSpace(name)
+	safe := filepath.Base(trimmed)
+	if safe == "" || safe == "." || safe == "/" || safe != trimmed {
 		return "", false
 	}
 	cleanDir := filepath.Clean(dir)

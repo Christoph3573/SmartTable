@@ -76,16 +76,23 @@ func main() {
 	// small public surface explicit and authenticate every other API operation.
 	r.Use(func(next http.Handler) http.Handler {
 		protected := appmw.Auth(jwtSecret)(next)
+		// /api/v1/mcp löst den Tenant selbst auf: JWT (Browser) ODER
+		// X-Session-Token (OpenCode als MCP-Client). Ein hartes Auth hier
+		// würde den Session-Token-Pfad blockieren — deshalb nur optionales
+		// JWT (Claims setzen, wenn valide), nicht Auth.
+		optional := appmw.OptionalAuth(jwtSecret)(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if req.URL.Path == "/health" || req.URL.Path == "/api/v1/health" || req.URL.Path == "/ws" ||
+			switch {
+			case req.URL.Path == "/api/v1/mcp" || req.URL.Path == "/api/v1/mcp/" ||
+				req.URL.Path == "/api/v1/mcp/messages":
+				optional.ServeHTTP(w, req)
+			case req.URL.Path == "/health" || req.URL.Path == "/api/v1/health" || req.URL.Path == "/ws" ||
 				req.URL.Path == "/api/v1/auth/login" || req.URL.Path == "/api/v1/auth/refresh" || req.URL.Path == "/api/v1/auth/logout" ||
-				req.URL.Path == "/api/v1/auth/register" || req.URL.Path == "/api/v1/public/schools" || req.URL.Path == "/api/v1/public/classes" ||
-				req.URL.Path == "/api/v1/mcp" || req.URL.Path == "/api/v1/mcp/" ||
-				req.URL.Path == "/api/v1/mcp/messages" {
+				req.URL.Path == "/api/v1/auth/register" || req.URL.Path == "/api/v1/public/schools" || req.URL.Path == "/api/v1/public/classes":
 				next.ServeHTTP(w, req)
-				return
+			default:
+				protected.ServeHTTP(w, req)
 			}
-			protected.ServeHTTP(w, req)
 		})
 	})
 
