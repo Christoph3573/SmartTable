@@ -135,6 +135,24 @@ deploy/
 
 Keine neuen GitHub Secrets nötig — der Deploy läuft über die bereits vorhandenen SSH-Secrets (`SSH_PRIVATE_KEY`, `VM_HOST`, `VM_USER`, `PI_TUNNEL_PORT`, `PI_USER`, `EMANUEL_*`). `jwt_secret` und `postgres_password` liegen direkt in `inventory/host_vars/<host>/vars.yml` (pro Host unterschiedlich, nicht geteilt). Kein `ansible-vault` im Einsatz.
 
+## CI/CD (GitHub Actions)
+
+Ein Workflow: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) — CI (`.github`-Job `ci`) und CD (`deploy-*`) sind über `needs: ci` verknüpft.
+
+**Was CI prüft** (`ci`, läuft bei jedem Pull Request und bei jedem Push auf `develop`/`main`):
+
+- **Backend** (`apps/schulapp-backend`): `go vet ./...` und `go test ./...`. Die Handler-Tests brauchen eine erreichbare Postgres — der Job startet dafür einen `postgres:16-alpine`-Service und spielt vorher die Migrationen aus `migrations/` via `migrate/migrate` ein (`TEST_DATABASE_URL`).
+- **Frontend** (`apps/codeclub-ui`): `npm ci` + `npm run build` (beinhaltet den TypeScript-Check `tsc -b`).
+
+**Wann CD startet**: nur wenn `ci` grün ist (`needs: ci`) und nur nach einem Push auf einen Deploy-Branch:
+
+- `develop` → `deploy-christoph` (Dev): <https://christoph.codeclub.check24.fun>
+- `main` → `deploy-emanuel` (Prod): <https://emanuel.codeclub.check24.fun>
+
+Ein fehlgeschlagener Check stoppt das Deployment — die Deploy-Jobs werden dann übersprungen. Bei Pull Requests laufen ausschließlich die Checks, kein Deploy. Zusätzlich lässt sich der Workflow per `workflow_dispatch` manuell für den gewählten Branch starten.
+
+**Erfolg kontrollieren**: Im GitHub-Repo unter **Actions** den Lauf öffnen — erst muss `ci` grün sein, danach muss der passende `deploy-*`-Job grün sein. Anschließend die Codeclub-URL des Branches aufrufen und die Änderung sichtbar prüfen (Dev = `christoph…`, Prod = `emanuel…`).
+
 ## Lokale Entwicklung
 
 ```bash

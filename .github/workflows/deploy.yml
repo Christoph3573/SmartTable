@@ -1,12 +1,78 @@
-name: Deploy via Jump Host
+name: CI/CD
 
 on:
   workflow_dispatch:
+  pull_request:
   push:
     branches: [develop, main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # CI: läuft bei jedem Pull Request und bei jedem Push auf develop/main.
+  # Muss grün sein, damit die Deploy-Jobs starten (needs: ci).
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: schulapp
+          POSTGRES_PASSWORD: schulapp
+          POSTGRES_DB: schulapp_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U schulapp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/schulapp-backend/go.mod
+          cache-dependency-path: apps/schulapp-backend/go.sum
+
+      - name: Migrate test database
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}/apps/schulapp-backend/migrations:/migrations" \
+            migrate/migrate:v4.18.2 \
+            -path /migrations \
+            -database "postgres://schulapp:schulapp@127.0.0.1:5434/schulapp_test?sslmode=disable" \
+            up
+
+      - name: Backend vet
+        working-directory: apps/schulapp-backend
+        run: go vet ./...
+
+      - name: Backend tests
+        working-directory: apps/schulapp-backend
+        env:
+          TEST_DATABASE_URL: "postgres://schulapp:schulapp@127.0.0.1:5434/schulapp_test?sslmode=disable"
+        run: go test ./...
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/codeclub-ui/package-lock.json
+
+      - name: Frontend build
+        working-directory: apps/codeclub-ui
+        run: |
+          npm ci
+          npm run build
+
+  # CD (Dev): nur auf develop und nur wenn CI grün ist.
   deploy-christoph:
+    needs: ci
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +119,9 @@ jobs:
             -e schoolconnect_repo_src="$GITHUB_WORKSPACE/apps/schoolconnect" \
             -e opencode_repo_src="$GITHUB_WORKSPACE/apps/opencode"
 
+  # CD (Prod): nur auf main und nur wenn CI grün ist.
   deploy-emanuel:
+    needs: ci
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
