@@ -6,7 +6,9 @@
 - [ ] Random Crashes wo Lern-KI sagt OpenCode-Backend ist offline, passiert anscheinend bei File-Upload
 - [ ] Bei Admin- bzw. Lehrer-Account die Administration besser machen
 - [ ] Manchmal kann der opencode Agent nicht den Vertretungsplan (z.b. von Schoolconnect) lesen. 
-
+- [ ] Permission System und Rollen Managment
+- [ ] Datein, Chat und Aufgaben
+- [ ] Einstelluhng zwischen bycs wrapper und propiriätarieeeeee
 `apps/codeclub-ui` (React 19 + Vite + TS) und `apps/schulapp-backend` (Go + chi + Postgres) — Roadmap und Architektur-Docs in [`docs/`](docs/).
 
 **Deploy:** Push nach `develop` deployt auf **pi-christoph** (Dev), Push nach `main` auf **pi-emanuel** (Prod). Jeder Host fährt den kompletten Stack als Docker Compose (eigene Container/Netz/Volumes/Ports — siehe `deploy/roles/schulapp_docker/`), damit sich Dev/Prod und andere Dienste auf dem Host nicht in die Quere kommen.
